@@ -1,0 +1,31 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "storageLocation": {
+      "value": "eastus2"
+    },
+    "searchLocation": {
+      "value": "eastus"
+    },
+    "storageAccountName": {
+      "value": "hyroglyphisiq2026sa"
+    },
+    "containerName": {
+      "value": "knowledge"
+    },
+    "searchServiceName": {
+      "value": "hyroglyphisiq2026"
+    },
+    "searchSkuName": {
+      "value": "basic"
+    },
+    "tags": {
+      "value": {
+        "app": "hyroglyphis",
+        "environment": "prod",
+        "purpose": "foundry-iq"
+      }
+    }
+  }
+}

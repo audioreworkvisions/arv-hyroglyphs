@@ -1,0 +1,5 @@
+- ARV core look: dark analog archive, black paper, damaged photocopy grain, scratched 16mm dust, CRT bleed, cyan-magenta misregistration, cobalt shadow, rust-amber projector glow, faded cream relief.
+- Composition: one dominant subject or event, sparse frame, hard contrast, poster-like readability, lower third kept clean for OBS overlays.
+- Motion: locked or very slow camera, controlled hypnotic movement, one clean payoff, loop-ready afterimage, no hectic pacing.
+- References: abstraction, silhouettes, codex-panel geometry, stone-relief logic, woven pattern logic, cosmic archive systems, machine folklore.
+- Avoid: mascots, cute/playful tone, smiling faces, big eyes, pastel candy color, glossy toy-like 3D, anime/Pixar/Disney language, fantasy-cartoon palettes, decorative pseudo-sacred illustration, readable sacred text, fake inscriptions.

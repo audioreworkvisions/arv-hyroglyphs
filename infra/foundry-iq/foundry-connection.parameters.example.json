@@ -1,0 +1,24 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "aiServicesAccountName": {
+      "value": "m2022-mcbihu3w-eastus2"
+    },
+    "projectName": {
+      "value": "m2022-mcbihu3w-eastus2_project"
+    },
+    "connectionName": {
+      "value": "hyroglyphis-iq-kb-mcp"
+    },
+    "searchEndpoint": {
+      "value": "https://hyroglyphisiq2026.search.windows.net"
+    },
+    "knowledgeBaseName": {
+      "value": "hyroglyphis-iq-kb"
+    },
+    "knowledgeBaseApiKey": {
+      "value": "set-me-at-deploy-time"
+    }
+  }
+}

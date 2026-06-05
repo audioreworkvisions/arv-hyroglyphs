@@ -1,0 +1,5 @@
+{
+  "name": "Hyroglyphs",
+  "description": "Generate GIFs from simple text with Veo 3.1. Features a Preset System, Continuity Tracking, and an Auto-Story Generator.",
+  "requestFramePermissions": []
+}

@@ -1,0 +1,81 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.41.2.15936",
+      "templateHash": "11538535429352748709"
+    }
+  },
+  "parameters": {
+    "aiServicesAccountName": {
+      "type": "string",
+      "metadata": {
+        "description": "Azure AI Services / Foundry account name that hosts the target project."
+      }
+    },
+    "projectName": {
+      "type": "string",
+      "metadata": {
+        "description": "Azure AI Foundry project name inside the AI Services account."
+      }
+    },
+    "connectionName": {
+      "type": "string",
+      "defaultValue": "hyroglyphis-iq-kb-mcp",
+      "metadata": {
+        "description": "Project connection name to create or update."
+      }
+    },
+    "searchEndpoint": {
+      "type": "string",
+      "metadata": {
+        "description": "Azure AI Search endpoint, for example https://mysearch.search.windows.net"
+      }
+    },
+    "knowledgeBaseName": {
+      "type": "string",
+      "metadata": {
+        "description": "Knowledge base name exposed through the Search MCP endpoint."
+      }
+    },
+    "knowledgeBaseApiKey": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Query key or other KB-compatible API key used by the Foundry MCP connection."
+      }
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.CognitiveServices/accounts/projects/connections",
+      "apiVersion": "2026-03-15-preview",
+      "name": "[format('{0}/{1}/{2}', split(format('{0}/{1}', parameters('aiServicesAccountName'), parameters('projectName')), '/')[0], split(format('{0}/{1}', parameters('aiServicesAccountName'), parameters('projectName')), '/')[1], parameters('connectionName'))]",
+      "properties": {
+        "authType": "CustomKeys",
+        "category": "RemoteTool",
+        "credentials": {
+          "keys": {
+            "api-key": "[parameters('knowledgeBaseApiKey')]"
+          }
+        },
+        "group": "GenericProtocol",
+        "isDefault": true,
+        "isSharedToAll": false,
+        "metadata": {
+          "knowledgeBaseName": "[parameters('knowledgeBaseName')]",
+          "type": "knowledgeBase_MCP"
+        },
+        "target": "[format('{0}/knowledgebases/{1}/mcp?api-version=2026-05-01-preview', parameters('searchEndpoint'), parameters('knowledgeBaseName'))]",
+        "useWorkspaceManagedIdentity": false
+      }
+    }
+  ],
+  "outputs": {
+    "connectionId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.CognitiveServices/accounts/projects/connections', split(format('{0}/{1}', parameters('aiServicesAccountName'), parameters('projectName')), '/')[0], split(format('{0}/{1}', parameters('aiServicesAccountName'), parameters('projectName')), '/')[1], parameters('connectionName'))]"
+    }
+  }
+}

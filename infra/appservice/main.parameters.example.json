@@ -1,0 +1,37 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "value": "westeurope"
+    },
+    "appName": {
+      "value": "hyroglyphis-app-prod"
+    },
+    "appServicePlanName": {
+      "value": "hyroglyphis-app-plan"
+    },
+    "skuName": {
+      "value": "B1"
+    },
+    "workerCount": {
+      "value": 1
+    },
+    "nodeRuntime": {
+      "value": "22-lts"
+    },
+    "healthCheckPath": {
+      "value": "/"
+    },
+    "alwaysOn": {
+      "value": true
+    },
+    "appSettings": {
+      "value": {
+        "HYROGLYPHIS_IQ_PROVIDER": "auto",
+        "AZURE_FOUNDRY_IQ_AGENT_NAME": "hyroglyphis-iq-agent",
+        "AZURE_FOUNDRY_IQ_AGENT_VERSION": "1"
+      }
+    }
+  }
+}

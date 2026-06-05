@@ -1,0 +1,14 @@
+name: hyroglyphis-appservice
+
+metadata:
+  template: hyroglyphis-appservice
+
+infra:
+  provider: bicep
+  path: infra/appservice
+
+services:
+  web:
+    project: .
+    language: js
+    host: appservice

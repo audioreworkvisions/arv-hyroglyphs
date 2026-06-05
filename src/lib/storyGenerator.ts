@@ -1,0 +1,1 @@
+export { generateStorySequence } from '../../lib/storyGenerator';
