@@ -112,7 +112,11 @@ export const resolveThumbnailCreativeMemory = async (
   let brief = null;
   try {
     brief = await resolveIQBrief(context);
-  } catch {
+  } catch (error) {
+    console.warn(
+      '[thumbnail-iq] resolveIQBrief threw — Foundry IQ memory inactive:',
+      error instanceof Error ? `${error.name}: ${error.message}` : error,
+    );
     brief = null;
   }
 
@@ -163,8 +167,19 @@ export const isFoundryIqConfigured = (): boolean => {
     return false;
   }
   const agentName = (process.env.AZURE_FOUNDRY_IQ_AGENT_NAME || '').trim();
-  const endpoint = (process.env.AZURE_EXISTING_AIPROJECT_ENDPOINT || '').trim();
-  const key = (process.env.AZURE_AI_FOUNDRY_KEY || process.env.AZURE_OPENAI_COMPLETIONS_KEY || '').trim();
+  const endpoint = (
+    process.env.AZURE_FOUNDRY_IQ_ENDPOINT
+    || process.env.AZURE_OPENAI_COMPLETIONS_ENDPOINT
+    || process.env.AZURE_AI_FOUNDRY_ENDPOINT
+    || process.env.AZURE_EXISTING_AIPROJECT_ENDPOINT
+    || ''
+  ).trim();
+  const key = (
+    process.env.AZURE_AI_FOUNDRY_KEY
+    || process.env.AZURE_OPENAI_COMPLETIONS_KEY
+    || process.env.AZURE_OPENAI_KEY
+    || ''
+  ).trim();
   return Boolean(agentName && endpoint && key);
 };
 

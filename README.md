@@ -123,6 +123,27 @@ High-level flow:
 4. If the remote agent is unavailable, Hyroglyphs falls back to curated local knowledge from repo documents.
 5. The resulting brief is injected into the final model prompt before rendering.
 
+### Authentication for the remote IQ agent
+
+The Foundry IQ agent (`AZURE_FOUNDRY_IQ_AGENT_NAME`) is reached on the project
+responses surface (`…services.ai.azure.com/api/projects/<project>/openai/v1`),
+which is derived automatically from `AZURE_OPENAI_COMPLETIONS_ENDPOINT` /
+`AZURE_AI_FOUNDRY_ENDPOINT` (or set explicitly via `AZURE_FOUNDRY_IQ_ENDPOINT`).
+
+If the agent's tools use **OBO (on-behalf-of) auth**, an API key is **not**
+sufficient — Azure rejects it with `Tools configured with OBO auth are not
+supported with API key authentication`. Hyroglyphs therefore acquires a
+Microsoft Entra ID token via `DefaultAzureCredential` and sends it as a bearer
+token. To enable the remote agent:
+
+- run `az login` (or provide a managed identity in production), and
+- grant that identity an appropriate role on the Foundry project (e.g. **Azure AI User**) plus access to the knowledge source.
+
+Auth behaviour is controlled by `AZURE_FOUNDRY_IQ_AUTH` (`auto` | `aad` |
+`api-key`, default `auto`) and `AZURE_FOUNDRY_IQ_SCOPE`
+(default `https://ai.azure.com/.default`). When no token can be acquired,
+the app gracefully falls back to curated local knowledge.
+
 This means the app can preserve:
 
 - stylistic continuity

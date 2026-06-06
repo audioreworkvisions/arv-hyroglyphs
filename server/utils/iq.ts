@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import OpenAI from 'openai';
+import { DefaultAzureCredential, type AccessToken, type TokenCredential } from '@azure/identity';
 
 export type IQMode = 'stillframe' | 'story' | 'thumbnail';
 export type IQRenderTarget = 'sketch' | 'video' | 'thumbnail' | 'image';
@@ -74,15 +75,72 @@ interface IQStructuredResult {
   citations?: Array<{ source?: string; excerpt?: string }>;
 }
 
-const IQ_PROVIDER = (process.env.HYROGLYPHIS_IQ_PROVIDER || 'auto').trim().toLowerCase();
-const IQ_AGENT_NAME = (process.env.AZURE_FOUNDRY_IQ_AGENT_NAME || '').trim();
-const IQ_AGENT_VERSION = (process.env.AZURE_FOUNDRY_IQ_AGENT_VERSION || '').trim();
-const IQ_MODEL = (
-  process.env.AZURE_OPENAI_IQ_MODEL
-  || process.env.AZURE_OPENAI_TEXT_MODEL
-  || process.env.AZURE_OPENAI_STORYBOARD_MODEL
-  || 'gpt-4.1-mini'
-).trim();
+const getIqProvider = (): string =>
+  (process.env.HYROGLYPHIS_IQ_PROVIDER || 'auto').trim().toLowerCase();
+const getIqAgentName = (): string =>
+  (process.env.AZURE_FOUNDRY_IQ_AGENT_NAME || '').trim();
+const getIqAgentVersion = (): string =>
+  (process.env.AZURE_FOUNDRY_IQ_AGENT_VERSION || '').trim();
+const getIqModel = (): string =>
+  (
+    process.env.AZURE_OPENAI_IQ_MODEL
+    || process.env.AZURE_OPENAI_TEXT_MODEL
+    || process.env.AZURE_OPENAI_STORYBOARD_MODEL
+    || 'gpt-4.1-mini'
+  ).trim();
+
+// Auth mode for the Foundry IQ agent. Agents whose tools use OBO (on-behalf-of)
+// auth cannot be called with an API key and require a Microsoft Entra ID token.
+// 'auto' (default) tries Entra ID first and falls back to the API key.
+const getIqAuthMode = (): string =>
+  (process.env.AZURE_FOUNDRY_IQ_AUTH || 'auto').trim().toLowerCase();
+const getIqTokenScope = (): string =>
+  (process.env.AZURE_FOUNDRY_IQ_SCOPE || 'https://ai.azure.com/.default').trim();
+
+let cachedCredential: TokenCredential | null = null;
+let cachedToken: AccessToken | null = null;
+
+const getCredential = (): TokenCredential => {
+  if (!cachedCredential) {
+    cachedCredential = new DefaultAzureCredential();
+  }
+  return cachedCredential;
+};
+
+/**
+ * Acquire a Microsoft Entra ID access token for the Foundry IQ agent.
+ * Returns null when token acquisition is disabled or fails (e.g. no `az login`,
+ * no managed identity), so the caller can fall back to API-key auth.
+ */
+const acquireAgentEntraToken = async (): Promise<string | null> => {
+  const mode = getIqAuthMode();
+  if (mode === 'api-key' || mode === 'apikey' || mode === 'key') {
+    return null;
+  }
+
+  // Reuse a cached token until ~2 minutes before expiry.
+  if (cachedToken && cachedToken.expiresOnTimestamp - Date.now() > 120_000) {
+    return cachedToken.token;
+  }
+
+  try {
+    const token = await getCredential().getToken(getIqTokenScope());
+    if (token?.token) {
+      cachedToken = token;
+      return token.token;
+    }
+    return null;
+  } catch (error) {
+    cachedToken = null;
+    if (getIqAuthMode() === 'aad' || getIqAuthMode() === 'entra') {
+      console.warn(
+        '[iq] Entra ID token acquisition failed for Foundry IQ agent (run `az login` or assign a managed identity):',
+        error instanceof Error ? `${error.name}: ${error.message}` : error,
+      );
+    }
+    return null;
+  }
+};
 
 const LOCAL_KB_TEXT_FILES = [
   'memories/repo/arv-style.md',
@@ -281,7 +339,62 @@ const getAzureProjectClient = (): OpenAI | null => {
   });
 };
 
-const hasRemoteIQAgent = (): boolean => Boolean(getAzureProjectClient() && IQ_AGENT_NAME);
+/**
+ * Resolve the base URL of the Foundry *project* responses surface, which is where
+ * the Foundry IQ agent (agent_reference) actually lives. This is intentionally
+ * different from AZURE_EXISTING_AIPROJECT_ENDPOINT (the openai.azure.com surface),
+ * because agent calls must go to the project endpoint
+ * (…services.ai.azure.com/api/projects/<project>/openai/v1).
+ */
+const resolveAgentBaseUrl = (): string => {
+  const explicit = trim(process.env.AZURE_FOUNDRY_IQ_ENDPOINT);
+  if (explicit) {
+    return explicit.replace(/\/(responses)\/?$/i, '').replace(/\/$/, '');
+  }
+
+  const completions = trim(process.env.AZURE_OPENAI_COMPLETIONS_ENDPOINT);
+  if (completions) {
+    // e.g. …/openai/v1/responses → …/openai/v1
+    return completions.replace(/\/(responses)\/?$/i, '').replace(/\/$/, '');
+  }
+
+  const projectEndpoint = trim(process.env.AZURE_AI_FOUNDRY_ENDPOINT);
+  if (projectEndpoint) {
+    const base = projectEndpoint.replace(/\/$/, '');
+    return /\/openai\/v\d+$/i.test(base) ? base : `${base}/openai/v1`;
+  }
+
+  return '';
+};
+
+const getAgentApiKey = (): string =>
+  trim(process.env.AZURE_AI_FOUNDRY_KEY)
+  || trim(process.env.AZURE_OPENAI_COMPLETIONS_KEY)
+  || trim(process.env.AZURE_OPENAI_KEY);
+
+/**
+ * Build the Foundry agent client. Prefers a Microsoft Entra ID bearer token
+ * (required when the agent's tools use OBO auth); otherwise uses the API key.
+ * The OpenAI SDK sends the provided credential as `Authorization: Bearer <value>`,
+ * which Azure accepts for both API keys and Entra tokens on the v1 surface.
+ */
+const getAzureAgentClient = (bearer?: string | null): OpenAI | null => {
+  const baseURL = resolveAgentBaseUrl();
+  const apiKey = bearer || getAgentApiKey();
+
+  if (!baseURL || !apiKey) {
+    return null;
+  }
+
+  return new OpenAI({
+    baseURL,
+    apiKey,
+  });
+};
+
+const hasRemoteIQAgent = (): boolean =>
+  Boolean(resolveAgentBaseUrl() && getAgentApiKey() && getIqAgentName());
+
 
 const buildChronologySummary = (chronology: IQChronologyEntry[] | undefined): string => {
   if (!chronology || chronology.length === 0) {
@@ -575,8 +688,15 @@ const buildHeuristicBrief = (query: string, chunks: IQKnowledgeChunk[]): IQBrief
 };
 
 const queryRemoteIQ = async (context: IQSceneContext, query: string): Promise<IQBrief | null> => {
-  const client = getAzureProjectClient();
-  if (!client || !IQ_AGENT_NAME) {
+  const agentName = getIqAgentName();
+  if (!agentName || !resolveAgentBaseUrl()) {
+    return null;
+  }
+
+  // Prefer an Entra ID token (required for OBO-auth tools); fall back to API key.
+  const entraToken = await acquireAgentEntraToken();
+  const client = getAzureAgentClient(entraToken);
+  if (!client) {
     return null;
   }
 
@@ -591,9 +711,9 @@ const queryRemoteIQ = async (context: IQSceneContext, query: string): Promise<IQ
       buildContextSummary(context),
     ].join('\n'),
     agent_reference: {
-      name: IQ_AGENT_NAME,
+      name: agentName,
       type: 'agent_reference',
-      ...(IQ_AGENT_VERSION ? { version: IQ_AGENT_VERSION } : {}),
+      ...(getIqAgentVersion() ? { version: getIqAgentVersion() } : {}),
     },
   } as any);
 
@@ -632,7 +752,7 @@ const queryLocalKnowledge = async (context: IQSceneContext, query: string): Prom
 
   try {
     const response = await client.chat.completions.create({
-      model: IQ_MODEL,
+      model: getIqModel(),
       messages: [
         {
           role: 'developer',
@@ -669,18 +789,23 @@ export async function resolveIQBrief(context: IQSceneContext): Promise<IQBrief |
   };
   const query = buildIQQuery(normalizedContext);
 
-  if (IQ_PROVIDER === 'off' || IQ_PROVIDER === 'disabled') {
+  const iqProvider = getIqProvider();
+  if (iqProvider === 'off' || iqProvider === 'disabled') {
     return null;
   }
 
-  if (IQ_PROVIDER === 'remote' || (IQ_PROVIDER === 'auto' && hasRemoteIQAgent())) {
+  if (iqProvider === 'remote' || (iqProvider === 'auto' && hasRemoteIQAgent())) {
     try {
       const remoteBrief = await queryRemoteIQ(normalizedContext, query);
       if (remoteBrief) {
         return remoteBrief;
       }
-    } catch {
-      // local fallback below
+      console.warn('[iq] Foundry IQ remote agent returned no brief — falling back to local knowledge.');
+    } catch (error) {
+      console.warn(
+        '[iq] Foundry IQ remote agent call failed — falling back to local knowledge:',
+        error instanceof Error ? `${error.name}: ${error.message}` : error,
+      );
     }
   }
 
