@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useCallback, useEffect, useState } from 'react';
-import { BookOpen, Cpu, Film, Loader2, Moon, Sparkles, Sun } from 'lucide-react';
+import { BookOpen, Film, Loader2, Moon, Sparkles, Sun } from 'lucide-react';
 import type { LibraryIdeaItem } from './lib/libraryDB';
 import { useLibrary } from './hooks/useLibrary';
 import { useFeedback } from './hooks/useFeedback';
@@ -9,11 +9,11 @@ import { generateStorySequence } from './lib/arvEngine';
 import { DEFAULT_STYLE_FLEX_MODE } from './lib/styleTaste';
 
 const Library = lazy(() => import('./components/Library'));
-const FictionStoryDesigner = lazy(() => import('./components/FictionStoryDesigner'));
 const StillframeHarness = lazy(() => import('./components/StillframeHarness'));
+const ThumbnailStudio = lazy(() => import('./components/ThumbnailStudio'));
 const AzureUsagePanel = lazy(() => import('./components/AzureUsagePanel'));
-
-type StudioTab = 'fiction' | 'library';
+const RandomGifGenerator = lazy(() => import('./components/arv-live/RandomGifGenerator'));
+const RandomVideoGenerator = lazy(() => import('./components/arv-live/RandomVideoGenerator'));
 
 interface BrowserLocationState {
   pathname: string;
@@ -21,31 +21,6 @@ interface BrowserLocationState {
 }
 
 const STILLFRAME_IDEA_REMIX_STORAGE_KEY = 'hyroglyphis:stillframe-ideas-remix';
-
-const storeStillframeSeed = (seed: string, sourceTitle?: string): boolean => {
-  if (typeof window === 'undefined') {
-    return false;
-  }
-
-  const normalizedSeed = seed.trim();
-  if (!normalizedSeed) {
-    return false;
-  }
-
-  try {
-    window.sessionStorage.setItem(
-      STILLFRAME_IDEA_REMIX_STORAGE_KEY,
-      JSON.stringify({
-        mode: 'ritual',
-        seed: normalizedSeed,
-        sourceTitle,
-      }),
-    );
-    return true;
-  } catch {
-    return false;
-  }
-};
 
 const getBrowserLocationState = (): BrowserLocationState => {
   if (typeof window === 'undefined') {
@@ -58,18 +33,10 @@ const getBrowserLocationState = (): BrowserLocationState => {
   };
 };
 
-const resolveStudioTab = (location: BrowserLocationState): StudioTab => {
-  if (location.pathname === '/library') {
-    return 'library';
-  }
-
-  return 'fiction';
-};
-
 function SurfaceFallback({ label, fullScreen = false }: { label: string; fullScreen?: boolean }) {
   return (
-    <div className={`signal-fallback ${fullScreen ? 'min-h-screen' : 'min-h-[320px]'} flex items-center justify-center bg-stone-50 dark:bg-zinc-950 text-stone-500 dark:text-stone-400`}>
-      <div className="signal-fallback__panel flex items-center gap-3 rounded-2xl border border-stone-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 px-5 py-4 shadow-sm">
+    <div className={`${fullScreen ? 'min-h-screen' : 'min-h-[320px]'} flex items-center justify-center bg-stone-50 text-stone-500 dark:bg-zinc-950 dark:text-stone-400`}>
+      <div className="flex items-center gap-3 rounded-2xl border border-stone-200 bg-white/80 px-5 py-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/80">
         <Loader2 size={18} className="animate-spin" />
         <span className="text-sm font-medium">{label}</span>
       </div>
@@ -79,6 +46,24 @@ function SurfaceFallback({ label, fullScreen = false }: { label: string; fullScr
 
 export default function App() {
   const [browserLocation, setBrowserLocation] = useState<BrowserLocationState>(getBrowserLocationState);
+  const { items: libraryItems, save: saveToLibrary, remove: removeFromLibrary, clearAll: clearLibrary } = useLibrary();
+  const { styleProfile, getFeedbackFor, submitFeedback } = useFeedback();
+  const { entries: azureUsageEntries, addEntry: addAzureUsageEntry, clearEntries: clearAzureUsage, totals: azureUsageTotals } = useAzureUsage();
+  const [savedToast, setSavedToast] = useState(false);
+  const [arvStoryboard, setArvStoryboard] = useState<ARVStorySequence | null>(null);
+  const [model, setModel] = useState<'openai' | 'foundry'>('foundry');
+  const [darkMode, setDarkMode] = useState(() => {
+    if (typeof window === 'undefined') {
+      return true;
+    }
+
+    try {
+      return window.localStorage.getItem('hyroglyphis-theme') !== 'light';
+    } catch {
+      return document.documentElement.classList.contains('dark');
+    }
+  });
+  const styleMode = DEFAULT_STYLE_FLEX_MODE;
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -92,6 +77,26 @@ export default function App() {
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', darkMode);
+
+    try {
+      window.localStorage.setItem('hyroglyphis-theme', darkMode ? 'dark' : 'light');
+    } catch {
+      // ignore storage failures
+    }
+  }, [darkMode]);
+
+  useEffect(() => {
+    if (browserLocation.pathname === '/library') {
+      document.title = 'Hyroglyphs Library';
+    } else if (browserLocation.pathname === '/thumbnail-studio') {
+      document.title = 'ARV Thumbnail Studio';
+    } else {
+      document.title = 'Hyroglyphs Stillframe Studio';
+    }
+  }, [browserLocation.pathname]);
 
   const navigate = useCallback((target: string) => {
     if (typeof window === 'undefined') {
@@ -117,76 +122,10 @@ export default function App() {
     setBrowserLocation(nextLocation);
   }, []);
 
-  if (browserLocation.pathname === '/stillframe') {
-    return (
-      <Suspense fallback={<SurfaceFallback label="Stillframe Rituals wird geladen" fullScreen />}>
-        <StillframeHarness onNavigateBack={() => navigate('/')} />
-      </Suspense>
-    );
-  }
-
-  return <StudioApp navigate={navigate} browserLocation={browserLocation} />;
-}
-
-interface StudioAppProps {
-  navigate: (target: string) => void;
-  browserLocation: BrowserLocationState;
-}
-
-function StudioApp({ navigate, browserLocation }: StudioAppProps) {
-  const [activeTab, setActiveTab] = useState<StudioTab>(() => resolveStudioTab(browserLocation));
-  const { items: libraryItems, save: saveToLibrary, remove: removeFromLibrary, clearAll: clearLibrary } = useLibrary();
-  const { styleProfile, getFeedbackFor, submitFeedback } = useFeedback();
-  const { entries: azureUsageEntries, addEntry: addAzureUsageEntry, clearEntries: clearAzureUsage, totals: azureUsageTotals } = useAzureUsage();
-  const [savedToast, setSavedToast] = useState(false);
-  const [arvStoryboard, setArvStoryboard] = useState<ARVStorySequence | null>(null);
-  const [model, setModel] = useState<'openai' | 'foundry'>('foundry');
-  const [darkMode, setDarkMode] = useState(() => {
-    if (typeof window === 'undefined') {
-      return true;
-    }
-
-    try {
-      return window.localStorage.getItem('hyroglyphis-theme') !== 'light';
-    } catch {
-      return document.documentElement.classList.contains('dark');
-    }
-  });
-  const styleMode = DEFAULT_STYLE_FLEX_MODE;
-
-  useEffect(() => {
-    setActiveTab(resolveStudioTab(browserLocation));
-  }, [browserLocation]);
-
-  useEffect(() => {
-    if (browserLocation.pathname === '/library') {
-      document.title = 'Hyroglyphs Library';
-      return;
-    }
-
-    document.title = 'Hyroglyphs ARV Story Studio';
-  }, [browserLocation.pathname]);
-
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', darkMode);
-
-    try {
-      window.localStorage.setItem('hyroglyphis-theme', darkMode ? 'dark' : 'light');
-    } catch {
-      // ignore storage failures
-    }
-  }, [darkMode]);
-
-  const handleTabChange = useCallback((tab: StudioTab) => {
-    setActiveTab(tab);
-
-    if (tab === 'library') {
-      navigate('/library');
-      return;
-    }
-
-    navigate('/');
-  }, [navigate]);
+  const showSavedToast = useCallback(() => {
+    setSavedToast(true);
+    window.setTimeout(() => setSavedToast(false), 3000);
+  }, []);
 
   const handleRemixIdeaPack = useCallback((item: LibraryIdeaItem) => {
     if (typeof window === 'undefined') {
@@ -222,211 +161,111 @@ function StudioApp({ navigate, browserLocation }: StudioAppProps) {
     navigate('/stillframe');
   }, [navigate]);
 
-  const handleOpenStillframeSeed = useCallback((prompt: string) => {
-    if (!storeStillframeSeed(prompt, 'ARV Story Studio Seed')) {
-      return;
-    }
-
-    navigate('/stillframe');
-  }, [navigate]);
+  const isLibraryRoute = browserLocation.pathname === '/library';
+  const isThumbnailStudioRoute = browserLocation.pathname === '/thumbnail-studio';
 
   return (
-    <div className="signal-shell min-h-screen bg-stone-50 dark:bg-zinc-950 text-stone-900 dark:text-stone-100 transition-colors duration-300 font-sans">
-      <header className="signal-header border-b border-stone-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-md sticky top-0 z-10">
-        <div className="signal-header__inner max-w-7xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
-          <button
-            type="button"
-            onClick={() => handleTabChange('fiction')}
-            className="signal-brand flex items-center gap-3 text-left"
-          >
-            <div className="signal-brand__mark">
-              <img src="/arv-symbole_logo.png" alt="Hyroglyphs Logo" className="signal-brand__logo w-8 h-8 rounded-lg object-contain" />
-            </div>
-            <div className="signal-brand__copy">
-              <div className="text-[11px] uppercase tracking-[0.2em] text-stone-500 dark:text-stone-400 font-semibold">
-                Hyroglyphs / ARV Story Studio
-              </div>
-              <h1 className="text-xl font-bold tracking-tight text-stone-950 dark:text-stone-100">
-                Story-first Surface
-              </h1>
-            </div>
-          </button>
-
-          <div className="signal-header__controls flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => navigate('/stillframe')}
-              className="flex items-center gap-2 rounded-full border border-indigo-300 dark:border-indigo-800/70 bg-indigo-50 dark:bg-indigo-950/30 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-indigo-700 dark:text-indigo-300 transition-colors hover:border-indigo-400 dark:hover:border-indigo-700"
-              title="Stillframe Rituals"
-            >
-              <Film size={14} />
-              Stillframe
-            </button>
-            <button
-              type="button"
-              onClick={() => setDarkMode((current) => !current)}
-              className="signal-theme-toggle p-2 rounded-full hover:bg-stone-200 dark:hover:bg-zinc-800 transition-colors"
-              title="Toggle Dark Mode"
-            >
-              {darkMode ? <Sun size={20} /> : <Moon size={20} />}
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <main className="signal-main max-w-7xl mx-auto px-4 py-8 md:py-12 space-y-10">
-        <section className="relative overflow-hidden rounded-[32px] border border-stone-200 dark:border-zinc-800 bg-gradient-to-br from-stone-100 via-white to-indigo-50 dark:from-zinc-950 dark:via-zinc-900 dark:to-indigo-950/40 p-6 md:p-8 shadow-sm">
-          <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top_right,_rgba(99,102,241,0.18),_transparent_38%),radial-gradient(circle_at_bottom_left,_rgba(34,211,238,0.16),_transparent_32%)] dark:bg-[radial-gradient(circle_at_top_right,_rgba(129,140,248,0.2),_transparent_36%),radial-gradient(circle_at_bottom_left,_rgba(34,211,238,0.16),_transparent_32%)]" />
-          <div className="relative grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(280px,0.75fr)] xl:items-end">
-            <div className="space-y-5">
-              <div className="flex flex-wrap gap-2 text-[11px] uppercase tracking-[0.24em] text-stone-500 dark:text-stone-400 font-semibold">
-                <span className="rounded-full border border-stone-300/80 dark:border-zinc-700 bg-white/80 dark:bg-zinc-950/70 px-3 py-1">ARV Seed Engine</span>
-                <span className="rounded-full border border-indigo-300/70 dark:border-indigo-800/60 bg-indigo-50/80 dark:bg-indigo-950/40 px-3 py-1 text-indigo-600 dark:text-indigo-300">Story Scene Composer</span>
-                <span className="rounded-full border border-cyan-300/70 dark:border-cyan-800/60 bg-cyan-50/80 dark:bg-cyan-950/30 px-3 py-1 text-cyan-700 dark:text-cyan-300">Stillframe Rituals</span>
-              </div>
-
-              <div>
-                <h2 className="text-3xl md:text-5xl font-bold tracking-tight text-stone-950 dark:text-stone-100 max-w-4xl">
-                  Eine reduzierte Oberfläche für Story-Seeds, Stillframe-Rituale, Library und Azure Usage.
-                </h2>
-                <p className="mt-4 max-w-3xl text-sm md:text-base text-stone-600 dark:text-stone-300 leading-relaxed">
-                  Die Root-Surface konzentriert sich jetzt vollständig auf ARV Story Studio: Seeds erzeugen, Szenen komponieren,
-                  Stillframe-Ideen öffnen, Ergebnisse speichern und den Azure-Verbrauch nachvollziehen.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  onClick={() => handleTabChange('fiction')}
-                  className="rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-700 transition-colors hover:border-stone-400 dark:border-zinc-700 dark:bg-zinc-900 dark:text-stone-200 dark:hover:border-zinc-500"
-                >
-                  Story Studio oeffnen
-                </button>
+    <>
+      {isThumbnailStudioRoute ? (
+        <Suspense fallback={<SurfaceFallback label="ARV Thumbnail Studio wird geladen" fullScreen />}>
+          <ThumbnailStudio
+            darkMode={darkMode}
+            onToggleDarkMode={() => setDarkMode((current) => !current)}
+            onNavigateStillframe={() => navigate('/stillframe')}
+            onNavigateLibrary={() => navigate('/library')}
+          />
+        </Suspense>
+      ) : isLibraryRoute ? (
+        <div className="min-h-screen bg-stone-50 text-stone-900 dark:bg-zinc-950 dark:text-stone-100">
+          <header className="sticky top-0 z-20 border-b border-stone-200 bg-white/80 px-4 py-3 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-950/80">
+            <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => navigate('/stillframe')}
-                  className="rounded-full border border-indigo-300 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 transition-colors hover:border-indigo-400 dark:border-indigo-800 dark:bg-indigo-950/30 dark:text-indigo-300 dark:hover:border-indigo-700"
+                  className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 transition hover:border-indigo-300 dark:border-indigo-900/60 dark:bg-indigo-950/30 dark:text-indigo-300"
                 >
-                  Stillframe Rituals
+                  <Film size={14} />
+                  Stillframe Studio
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleTabChange('library')}
-                  className="rounded-full border border-cyan-300 bg-cyan-50 px-4 py-2 text-sm font-semibold text-cyan-700 transition-colors hover:border-cyan-400 dark:border-cyan-800 dark:bg-cyan-950/30 dark:text-cyan-300 dark:hover:border-cyan-700"
+                  onClick={() => navigate('/thumbnail-studio')}
+                  className="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 transition hover:border-amber-300 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300"
                 >
-                  Library / Export
+                  <Sparkles size={14} />
+                  Thumbnail Studio
                 </button>
               </div>
-            </div>
-
-            <div className="rounded-[28px] border border-stone-200/80 dark:border-zinc-800 bg-stone-950 text-stone-100 p-5 md:p-6 shadow-xl shadow-stone-950/10">
-              <div className="text-[11px] uppercase tracking-[0.22em] text-stone-500 font-semibold">Studio focus</div>
-              <div className="mt-4 space-y-4 text-sm text-stone-300">
-                <div className="flex items-center gap-2 text-indigo-300 font-semibold">
-                  <Cpu size={16} />
-                  Story-first Root
-                </div>
-                <p>
-                  Keine Single-GIF-Surface mehr. Prompt-Aktionen aus ARV und Fiction gehen direkt als Stillframe-Seed weiter.
-                </p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-3">
-                    <div className="text-[10px] uppercase tracking-[0.18em] text-stone-500">Aktiver Renderer</div>
-                    <div className="mt-1 text-sm font-semibold text-white">{model === 'foundry' ? 'Azure Foundry' : 'OpenAI'}</div>
-                  </div>
-                  <div className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-3">
-                    <div className="text-[10px] uppercase tracking-[0.18em] text-stone-500">Story Seed</div>
-                    <div className="mt-1 text-sm font-semibold text-white">{arvStoryboard ? 'bereit' : 'leer'}</div>
-                  </div>
-                </div>
+              <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400">
+                Bibliothek · {libraryItems.length} Items
               </div>
+              <button
+                type="button"
+                onClick={() => setDarkMode((current) => !current)}
+                className="rounded-xl border border-stone-200 bg-white p-2 text-stone-600 transition hover:border-stone-300 dark:border-zinc-800 dark:bg-zinc-900 dark:text-stone-300"
+                title="Theme umschalten"
+              >
+                {darkMode ? <Sun size={16} /> : <Moon size={16} />}
+              </button>
             </div>
-          </div>
-        </section>
+          </header>
 
-        <div className="flex justify-center">
-          <div className="signal-tabs bg-stone-200/50 dark:bg-zinc-800/50 p-1.5 rounded-2xl flex gap-2">
-            <button
-              type="button"
-              onClick={() => handleTabChange('fiction')}
-              className={`signal-tab flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all ${
-                activeTab === 'fiction'
-                  ? 'signal-tab--active bg-white dark:bg-zinc-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
-                  : 'text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white'
-              }`}
-            >
-              <Sparkles size={20} />
-              Story Studio
-            </button>
-            <button
-              type="button"
-              onClick={() => handleTabChange('library')}
-              className={`signal-tab flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all ${
-                activeTab === 'library'
-                  ? 'signal-tab--active bg-white dark:bg-zinc-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
-                  : 'text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white'
-              }`}
-            >
-              <BookOpen size={20} />
-              Bibliothek
-              {libraryItems.length > 0 && (
-                <span className="signal-badge ml-1 px-1.5 py-0.5 text-xs rounded-full bg-indigo-500 text-white">
-                  {libraryItems.length}
-                </span>
-              )}
-            </button>
-          </div>
+          <main className="mx-auto max-w-7xl px-4 py-8">
+            <Suspense fallback={<SurfaceFallback label="Bibliothek wird geladen" />}>
+              <Library
+                items={libraryItems}
+                onDelete={removeFromLibrary}
+                onClearAll={clearLibrary}
+                onRemixIdeaPack={handleRemixIdeaPack}
+                onSubmitFeedback={submitFeedback}
+                onFollowUp={(concept) => {
+                  const board = generateStorySequence(concept, undefined, styleMode);
+                  setArvStoryboard(board);
+                  navigate('/stillframe');
+                }}
+                getFeedbackFor={getFeedbackFor}
+                styleProfile={styleProfile}
+              />
+            </Suspense>
+          </main>
         </div>
-
-        {savedToast && (
-          <div className="signal-toast fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 shadow-xl text-sm font-medium animate-fade-in">
-            <BookOpen size={16} />
-            In Bibliothek gespeichert
-          </div>
-        )}
-
-        <Suspense fallback={<SurfaceFallback label="Panel wird geladen" />}>
-          {activeTab === 'fiction' ? (
-            <FictionStoryDesigner
-              model={model}
-              setModel={setModel}
-              onStorySaved={() => {
-                setSavedToast(true);
-                window.setTimeout(() => setSavedToast(false), 3000);
-              }}
-              saveToLibrary={saveToLibrary}
-              preloadedStoryboard={arvStoryboard}
-              onAzureUsage={addAzureUsageEntry}
-              onUseStillframeSeed={handleOpenStillframeSeed}
-              onStoryboardCreated={setArvStoryboard}
-              styleProfile={styleProfile}
-              styleMode={styleMode}
-            />
-          ) : (
-            <Library
-              items={libraryItems}
-              onDelete={removeFromLibrary}
-              onClearAll={clearLibrary}
-              onRemixIdeaPack={handleRemixIdeaPack}
-              onSubmitFeedback={submitFeedback}
-              onFollowUp={(concept) => {
-                const board = generateStorySequence(concept, undefined, styleMode);
-                setArvStoryboard(board);
-                handleTabChange('fiction');
-              }}
-              getFeedbackFor={getFeedbackFor}
-              styleProfile={styleProfile}
-            />
-          )}
+      ) : (
+        <Suspense fallback={<SurfaceFallback label="Stillframe Studio wird geladen" fullScreen />}>
+          <StillframeHarness
+            model={model}
+            setModel={setModel}
+            saveToLibrary={saveToLibrary}
+            onStorySaved={showSavedToast}
+            preloadedStoryboard={arvStoryboard}
+            onAzureUsage={addAzureUsageEntry}
+            onNavigateLibrary={() => navigate('/library')}
+            onNavigateThumbnailStudio={() => navigate('/thumbnail-studio')}
+            libraryCount={libraryItems.length}
+          />
         </Suspense>
-      </main>
+      )}
+
+      {savedToast && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-xl bg-zinc-900 px-4 py-3 text-sm font-medium text-white shadow-xl dark:bg-white dark:text-zinc-900">
+          <BookOpen size={16} />
+          In Bibliothek gespeichert
+        </div>
+      )}
 
       {azureUsageEntries.length > 0 && (
         <Suspense fallback={null}>
           <AzureUsagePanel entries={azureUsageEntries} totals={azureUsageTotals} onClear={clearAzureUsage} />
         </Suspense>
       )}
-    </div>
+
+      <Suspense fallback={null}>
+        <RandomGifGenerator />
+      </Suspense>
+
+      <Suspense fallback={null}>
+        <RandomVideoGenerator />
+      </Suspense>
+    </>
   );
 }

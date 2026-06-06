@@ -10,6 +10,7 @@ import { createFoundryRoutes } from './routes/foundryRoutes';
 import { createGifRoutes } from './routes/gifRoutes';
 import { createOpenAIRoutes } from './routes/openAIRoutes';
 import { createStillframeRoutes } from './routes/stillframeRoutes';
+import { createThumbnailStudioRoutes } from './routes/thumbnailStudioRoutes';
 
 dotenv.config({ path: '.env.local' });
 
@@ -119,6 +120,7 @@ export async function startServer() {
   app.use(createGifRoutes());
   app.use(createFoundryRoutes());
   app.use(createStillframeRoutes());
+  app.use(createThumbnailStudioRoutes());
 
   const httpServer = createHttpServer(app);
 

@@ -202,53 +202,58 @@ export const createGifRoutes = () => {
 
       const tempVideoPath = path.join(os.tmpdir(), `temp_${Date.now()}.mp4`);
       const tempGifPath = path.join(os.tmpdir(), `temp_${Date.now()}.gif`);
-
-      if (videoBase64) {
-        const videoBuffer = Buffer.from(videoBase64.split(',')[1], 'base64');
-        fs.writeFileSync(tempVideoPath, videoBuffer);
-      } else if (videoUrl) {
-        console.log(`Downloading video from URL: ${videoUrl}`);
-        const response = await fetch(videoUrl);
-        if (!response.ok) {
-          throw new Error(`Failed to download video: ${response.statusText}`);
+      try {
+        if (videoBase64) {
+          const videoPayload = String(videoBase64).includes(',') ? String(videoBase64).split(',')[1] : String(videoBase64);
+          const videoBuffer = Buffer.from(videoPayload, 'base64');
+          fs.writeFileSync(tempVideoPath, videoBuffer);
+        } else if (videoUrl) {
+          console.log(`Downloading video from URL: ${videoUrl}`);
+          const response = await fetch(videoUrl);
+          if (!response.ok) {
+            throw new Error(`Failed to download video: ${response.statusText}`);
+          }
+          const arrayBuffer = await response.arrayBuffer();
+          const buffer = Buffer.from(arrayBuffer);
+          fs.writeFileSync(tempVideoPath, buffer);
         }
-        const arrayBuffer = await response.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-        fs.writeFileSync(tempVideoPath, buffer);
+
+        await new Promise<void>((resolve, reject) => {
+          ffmpeg(tempVideoPath)
+            .outputOptions([
+              '-vf',
+              gifVideoFilter,
+              '-loop',
+              '0',
+            ])
+            .toFormat('gif')
+            .on('end', () => {
+              console.log('GIF conversion finished.');
+              resolve();
+            })
+            .on('error', (err) => {
+              console.error('Error during GIF conversion:', err);
+              reject(err);
+            })
+            .save(tempGifPath);
+        });
+
+        const gifBuffer = fs.readFileSync(tempGifPath);
+        const gifBase64 = gifBuffer.toString('base64');
+
+        return res.json({
+          success: true,
+          outputSize: normalizedOutputSize,
+          aspectRatio: normalizedAspectRatio || undefined,
+          gifData: `data:image/gif;base64,${gifBase64}`,
+        });
+      } finally {
+        for (const filePath of [tempVideoPath, tempGifPath]) {
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+          }
+        }
       }
-
-      await new Promise<void>((resolve, reject) => {
-        ffmpeg(tempVideoPath)
-          .outputOptions([
-            '-vf',
-            gifVideoFilter,
-            '-loop',
-            '0',
-          ])
-          .toFormat('gif')
-          .on('end', () => {
-            console.log('GIF conversion finished.');
-            resolve();
-          })
-          .on('error', (err) => {
-            console.error('Error during GIF conversion:', err);
-            reject(err);
-          })
-          .save(tempGifPath);
-      });
-
-      const gifBuffer = fs.readFileSync(tempGifPath);
-      const gifBase64 = gifBuffer.toString('base64');
-
-      fs.unlinkSync(tempVideoPath);
-      fs.unlinkSync(tempGifPath);
-
-      return res.json({
-        success: true,
-        outputSize: normalizedOutputSize,
-        aspectRatio: normalizedAspectRatio || undefined,
-        gifData: `data:image/gif;base64,${gifBase64}`,
-      });
     } catch (error: any) {
       console.error('Error converting GIF:', error);
       return res.status(500).json({ error: error.message || 'An error occurred' });

@@ -1,0 +1,70 @@
+{
+  "pack": "arv-foundry-iq-style-pack",
+  "version": "2026-06-05",
+  "purpose": "Curated ARV / Hyroglyphs style grounding pack for Azure AI Foundry IQ and Azure AI Search Knowledge Base.",
+  "recommended_blob_folder": "kb/arv-style-pack",
+  "categories": [
+    "style",
+    "pattern",
+    "narrative",
+    "continuity",
+    "reference"
+  ],
+  "primary_use_cases": [
+    "Stillframe prompt generation",
+    "Story prompt generation",
+    "Remix and extend grounding",
+    "HeroGlyphs / Audioreworkvisions visual style continuity",
+    "Foundry IQ brief generation"
+  ],
+  "files": [
+    {
+      "path": "01_arv_style_identity.md",
+      "category": "style"
+    },
+    {
+      "path": "02_palette_material_texture.md",
+      "category": "style"
+    },
+    {
+      "path": "03_motion_loop_grammar.md",
+      "category": "pattern"
+    },
+    {
+      "path": "04_xerox_ritual_boogie.md",
+      "category": "pattern"
+    },
+    {
+      "path": "05_sci_fi_graffiti_fusion.md",
+      "category": "style"
+    },
+    {
+      "path": "06_story_dramaturgy.md",
+      "category": "narrative"
+    },
+    {
+      "path": "07_remix_extend_rules.md",
+      "category": "continuity"
+    },
+    {
+      "path": "08_negative_rules.md",
+      "category": "style"
+    },
+    {
+      "path": "09_prompt_dna_fragments.md",
+      "category": "reference"
+    },
+    {
+      "path": "10_scene_examples.md",
+      "category": "reference"
+    },
+    {
+      "path": "11_iq_runtime_examples.md",
+      "category": "reference"
+    },
+    {
+      "path": "12_agent_instructions.md",
+      "category": "reference"
+    }
+  ]
+}

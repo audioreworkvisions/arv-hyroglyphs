@@ -31,7 +31,7 @@ export interface LibraryIdeaItem {
   createdAt: number;
   prompt: string;
   title: string;
-  mode: 'ritual' | 'satire';
+  mode: 'ritual' | 'satire' | 'signal';
   seed?: string;
   referenceSummary?: string;
   clipboardText: string;

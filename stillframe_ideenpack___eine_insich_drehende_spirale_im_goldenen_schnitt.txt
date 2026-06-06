@@ -1,0 +1,51 @@
+Stillframe Ideas Pack (ritual)
+Seed: eine insich drehende spirale im goldenen schnitt
+
+Themes: Golden-ratio control loops as sacred machinery | Nocturnal precision spirals governing silent systems | Poisoned elegance of self-regulating geometry | Ritual calibration inside abstract engines | Synthetic cosmology reduced to one turning law | Quiet dominance of mathematically perfect motion
+Characters: An operator silhouette reduced to a single steady hand near the spiral | A sentient spiral-core acting as both machine and witness | A glass-encased micro-city caretaker orbiting the ratio curve | An artificial organ that breathes only through rotation | A control-room presence implied by cursor-light gestures | A dormant engine awakened by proportional alignment
+Events: The spiral reaches perfect golden alignment and locks | A calibration cycle completes and resets without sound | Micro-structures along the curve briefly illuminate | Chromatic shards phase into harmonic order | The engine exhales light and retracts | The system confirms balance and returns to idle
+Actions: Slow inward rotation tightening along the golden curve | Breathing expansion followed by measured contraction | Facet pulsing that propagates outward then fades | Orbital drift correcting itself into perfect proportion | Light pressure rising, cresting, then dissolving | A single decisive lock-in before seamless reset
+Stories: A control system that must continuously re-affirm the golden ratio to prevent collapse | An artificial heart whose only rhythm is proportional rotation | A miniature city powered by an unseen mathematical ritual | A spiral relic that is not worshipped but maintained | A machine that dreams only when its ratios are correct | A silent ceremony where balance is the sole outcome
+Styles: Calm nocturnal control-room abstraction with one dominant spiral | Chromatic shard geometry softened by bloom and haze | Luxury sci-fi ritual rendered in sparse high contrast | Micro-city infrastructure mapped onto a single curve | Glass-engine intimacy with restrained synthetic glow | Hard-edged minimalism anchored by poisoned elegance
+Prompt seeds: A self-rotating spiral built on the golden ratio hovers in void black, translucent acid-yellow and lime shards forming the curve, cyan haze hugging the rotation path, pale red ghost afterimages trailing edges, slow breathing rotation, lower third dark and empty, seamless ritual loop | Golden-ratio spiral engine inside a nocturnal control frame, glass and matte metal materials, chromatic shard facets pulsing in proportion, soft rim bloom and velvet blue shadow, single inward turn then reset, calm loop | Abstract spiral ritual: a precise golden curve traced by glowing shards over black space, micro-city lights briefly igniting along the arc, cyan mist pressure, controlled rotation and lock-in, OBS-safe lower third, seamless return | Luxury glass engine shaped as a proportional spiral, acid-yellow and translucent lime glow under diffused bloom, breathing expansion and contraction along the curve, poisoned elegance atmosphere, loop-ready stillframe | Minimal spiral cosmology: one dominant golden-ratio spiral rotating slowly, phosphor grain and CRT haze, pale red afterimage drag, calm control-light pulsing, dark uncluttered frame, seamless loop | Ritual calibration scene: chromatic shard spiral aligns to golden ratio, soft neon facet glow, dust ring orbit, slow orbital correction then idle, nocturnal calm, clean lower third
+Preset seeds: Chromatic Shard Torus Soft Bloom adapted to a golden-ratio spiral, breathing rotation, acid-yellow/lime shards, cyan haze, pale red ghosting, dark lower third | Glass Engine Breathing preset with proportional spiral geometry, sterile sensual glow, slow inhale-exhale motion, void black contrast | Micro-City on Vinyl mapped onto a single golden curve, miniature lights under glass, nocturnal infrastructure calm | Poisoned elegance spiral: velvet blue shadow, diffused rim bloom, translucent shard facets, seamless meditative loop | Control-room abstraction preset with phosphor grain, CRT haze, restrained synthetic glow, one dominant spiral event | Luxury ritual minimalism: matte black field, precise golden spiral, soft neon pressure, slow lock-and-release motion
+
+Vision 1: Golden Lock Spiral
+Theme: Golden-ratio control loops as sacred machinery
+Character: A sentient spiral-core acting as both machine and witness
+Event: The spiral reaches perfect golden alignment and locks
+Action: Slow inward rotation tightening along the golden curve
+Story: A control system that must continuously re-affirm the golden ratio to prevent collapse
+Style: Calm nocturnal control-room abstraction with one dominant spiral
+Prompt seed: A self-rotating golden-ratio spiral composed of translucent acid-yellow and lime shards floats in void black, cyan haze wrapping the curve, pale red afterimages dragging behind edges, slow breathing rotation that tightens then locks, seamless ritual loop, lower third dark and uncluttered
+Preset seed: Chromatic Shard Torus Soft Bloom adapted to a golden-ratio spiral with breathing rotation and poisoned elegance glow
+
+Vision 2: Proportional Heart Engine
+Theme: Ritual calibration inside abstract engines
+Character: An artificial organ that breathes only through rotation
+Event: The engine exhales light and retracts
+Action: Breathing expansion followed by measured contraction
+Story: An artificial heart whose only rhythm is proportional rotation
+Style: Glass-engine intimacy with restrained synthetic glow
+Prompt seed: Glass-like spiral engine following the golden ratio, luxury sci-fi ritual mood, acid-yellow and translucent lime illumination under soft bloom, cyan mist pressure, slow expand-contract rotation, calm nocturnal frame, seamless loop
+Preset seed: Glass Engine Breathing preset tuned to spiral geometry, sterile sensual light, slow inhale-exhale motion
+
+Vision 3: City on the Curve
+Theme: Synthetic cosmology reduced to one turning law
+Character: A glass-encased micro-city caretaker orbiting the ratio curve
+Event: Micro-structures along the curve briefly illuminate
+Action: Facet pulsing that propagates outward then fades
+Story: A miniature city powered by an unseen mathematical ritual
+Style: Micro-city infrastructure mapped onto a single curve
+Prompt seed: Miniature nocturnal city lights embedded along a golden-ratio spiral under glass, void black surroundings, cyan haze and soft neon pressure, slow rotational drift then illumination pulse, dark lower third, seamless ritual loop
+Preset seed: Micro-City on Vinyl preset bent into a golden spiral, nocturnal myth infrastructure with restrained glow
+
+Vision 4: Calibration Silence
+Theme: Quiet dominance of mathematically perfect motion
+Character: A control-room presence implied by cursor-light gestures
+Event: A calibration cycle completes and resets without sound
+Action: A single decisive lock-in before seamless reset
+Story: A silent ceremony where balance is the sole outcome
+Style: Hard-edged minimalism anchored by poisoned elegance
+Prompt seed: Minimal golden-ratio spiral in matte black space, chromatic shard facets with pale red ghost trails, phosphor grain and soft bloom, slow rotation to perfect alignment then gentle reset, OBS-safe lower third, seamless loop
+Preset seed: Control-room abstraction with chromatic shard bloom, precise spiral motion, calm nocturnal contrast

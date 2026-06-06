@@ -1,6 +1,27 @@
 import { StylePreset } from './types';
+import { arvMinimalSignalGeometryPreset } from './minimalSignalGeometryPreset';
 
 const ALL_PRESETS: StylePreset[] = [
+  {
+    id: arvMinimalSignalGeometryPreset.id,
+    name: arvMinimalSignalGeometryPreset.name,
+    colorPalette: 'Deep black, near-black CRT grey, electric cyan, hot magenta, warm ivory, ember orange, dirty white, optional acid lime or blue violet only as tiny accents',
+    lighting: 'Thin luminous line halation on matte black, subtle CRT glow, restrained amber ticks, cyan-magenta chromatic edge split',
+    cameraPerspective: arvMinimalSignalGeometryPreset.visualIdentity.camera,
+    textures: arvMinimalSignalGeometryPreset.texture.join(', '),
+    motionStyle: arvMinimalSignalGeometryPreset.motionRules.rhythm,
+    recurringSymbols: arvMinimalSignalGeometryPreset.motifs.join(', '),
+    atmosphere: 'Sparse technical hypnosis, vintage broadcast ident pressure, op-art signal test, analog machine ritual',
+    examplePrompt: arvMinimalSignalGeometryPreset.generationPromptTemplate,
+    visualIdentity: 'Minimal black-background CRT signal geometry: centered, symmetrical, sparse, thin linework, orbital rectangles, dots, barcode bars, and one clean loop payoff.',
+    shortPrompt: arvMinimalSignalGeometryPreset.promptCore,
+    negativePrompt: arvMinimalSignalGeometryPreset.negativePrompt,
+    motionRule: 'Use one controlled event only: reveal, micro-shift, chromatic split, brief hold, lock or collapse, clean return. No strobe or frantic glitch.',
+    colorRule: 'Stay mostly black with thin cyan, magenta, ivory, and small amber signal accents. Preserve large negative space.',
+    obsRule: 'Keep the lower third empty and black; hold the geometry in a readable central field.',
+    creativeDirection: 'Treat the scene as abstract signal geometry, not a character scene, landscape, HUD, corporate motion graphic, or glossy 3D logo.',
+    soraAvoid: arvMinimalSignalGeometryPreset.negativePrompt,
+  },
   {
     id: 'style-taste-archive',
     name: 'Underground Archive Transmission',

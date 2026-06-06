@@ -2,8 +2,8 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import OpenAI from 'openai';
 
-export type IQMode = 'stillframe' | 'story';
-export type IQRenderTarget = 'sketch' | 'video';
+export type IQMode = 'stillframe' | 'story' | 'thumbnail';
+export type IQRenderTarget = 'sketch' | 'video' | 'thumbnail' | 'image';
 export type IQPurpose = 'create' | 'remix' | 'extend';
 
 interface IQKnowledgeChunk {
@@ -90,6 +90,9 @@ const LOCAL_KB_TEXT_FILES = [
   'prompt_storys.md',
   'story_prompts.md',
   'stillframe_rituals_sketches.md',
+  'audio_titel_liste.md',
+  'arv-foundry-iq-style-pack/README.md',
+  'graffitti_morph_style.md',
   'README.md',
 ] as const;
 
@@ -298,6 +301,14 @@ const buildChronologySummary = (chronology: IQChronologyEntry[] | undefined): st
 };
 
 const buildIQQuery = (context: IQSceneContext): string => {
+  if (context.mode === 'thumbnail') {
+    return [
+      'Welche kuratierten ARV-Style-Regeln, Paletten und Titelmuster gelten fuer ein YouTube-Livestream-Thumbnail von Audioreworkvisions / Techno Transmissions?',
+      'Welche Negative Rules und verbotenen Stilbrueche muessen fuer ein Techno-Thumbnail beachtet werden?',
+      'Welche Prompt-DNA-Fragmente und Layout-Muster passen zu einem 16:9 Techno-Thumbnail mit lokal gerendertem Titeltext?',
+    ].join(' ');
+  }
+
   const queryParts = [
     `Welche ARV-Regeln, Pattern und dramaturgischen Hinweise gelten fuer diese ${context.mode === 'stillframe' ? 'Stillframe-' : 'Story-'}Szene?`,
     'Welche visuellen Motive, Material- und Farbregeln muessen erhalten bleiben?',
@@ -470,6 +481,10 @@ const scoreChunk = (chunk: IQKnowledgeChunk, context: IQSceneContext, queryToken
   }
 
   if (context.mode === 'story' && /story|prompt_storys|story-generation/i.test(chunk.source)) {
+    score += 2;
+  }
+
+  if (context.mode === 'thumbnail' && /arv-style|ARV\/|style-pack|thumbnail|techno|audio_titel/i.test(chunk.source)) {
     score += 2;
   }
 

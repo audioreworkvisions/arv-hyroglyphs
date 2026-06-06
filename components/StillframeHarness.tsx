@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ArrowLeft,
   BookOpen,
   Camera,
   ChevronsDown,
@@ -16,8 +15,9 @@ import {
   TriangleAlert,
   X,
 } from 'lucide-react';
-import { ARV_CHARACTERS } from '../lib/arvCharacters';
-import type { ARVSatireSketch } from '../lib/arvTypes';
+import StoryMode from './StoryMode';
+import type { ARVSatireSketch, ARVStorySequence } from '../lib/arvTypes';
+import { arvMinimalSignalGeometryPreset } from '../lib/minimalSignalGeometryPreset';
 import { PROMPT_TEMPLATES } from '../lib/promptTemplates';
 import {
   DEFAULT_STILLFRAME_SATIRE_PRESET_PROFILE_ID,
@@ -27,13 +27,14 @@ import {
   STILLFRAME_SATIRE_PRESET_PROFILES,
   type StillframeSatireElementCategory,
 } from '../lib/stillframeSatire';
-import { saveItem, type LibraryIdeaItem } from '../lib/libraryDB';
+import { saveItem, type LibraryIdeaItem, type LibraryItem } from '../lib/libraryDB';
+import type { AzureUsageEntry } from '../hooks/useAzureUsage';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 type BeatType = 'freeze' | 'onset' | 'hold' | 'return';
 type AssetStatus = 'idle' | 'loading' | 'converting' | 'done' | 'error';
-type GenerationMode = 'ritual' | 'satire';
+type GenerationMode = 'ritual' | 'satire' | 'signal';
 type VideoTransformMode = 'remix' | 'extend';
 type VideoRenderMode = 'create' | VideoTransformMode;
 
@@ -49,6 +50,7 @@ interface SceneState {
   title: string;
   prompt: string;
   motion: string;
+  durationSeconds: number;
   polishStatus: AssetStatus;
   sketchStatus: AssetStatus;
   sketchData: string | null;
@@ -56,6 +58,7 @@ interface SceneState {
   videoId: string | null;
   remixedFromVideoId: string | null;
   videoTransformMode: VideoTransformMode | null;
+  videoTransformPrompt: string;
   videoBase64: string | null;
   gifData: string | null;
   errorPolish: string | null;
@@ -202,19 +205,38 @@ const SATIRE_ELEMENT_CATEGORY_LABELS: Record<StillframeSatireElementCategory, st
 
 const MIN_KEYWORDS = 3;
 const MAX_KEYWORDS = 5;
-const MAX_REFERENCE_STYLE_KEYWORDS = 8;
 const MAX_REFERENCE_IMAGES = 4;
 const MAX_REFERENCE_FILE_BYTES = 15 * 1024 * 1024;
 const REFERENCE_ANALYSIS_MAX_DIMENSION = 1024;
+const SUPPORTED_VIDEO_DURATION_SECONDS = [4, 8, 12] as const;
+const DEFAULT_VIDEO_DURATION_SECONDS = 4;
 
-const IDEA_SECTION_CONFIG: Array<{ key: StillframeIdeaListKey; label: string; useTarget?: 'ritual' | 'satire' | 'both' }> = [
+const GENERATION_MODE_LABELS: Record<GenerationMode, string> = {
+  ritual: 'Ritual Story Beats',
+  satire: 'Satire Sketch',
+  signal: 'Minimal Signal Geometry',
+};
+
+const GENERATION_MODE_STATUS_LABELS: Record<GenerationMode, string> = {
+  ritual: 'Ritual Vision Lab',
+  satire: 'Satire Vision Lab',
+  signal: 'Signal Geometry Lab',
+};
+
+const GENERATION_MODE_DESCRIPTIONS: Record<GenerationMode, string> = {
+  ritual: 'Hypnotic micro-motion stop-frame loops via Azure OpenAI Foundry. Gib 3 bis 5 Schlagwoerter, ein freies Konzept oder Referenzbilder an, lass dir passende Stil-Presets und 4 diverse Szenen-Prompts bauen und rendere daraus GIF-Loops.',
+  satire: 'Einfacher ARV-Satiremodus mit zwei Figuren, einem optionalen Satire-Fokus und direkt generierten Sketch- plus GIF-Szenen.',
+  signal: 'Minimalistische CRT-Signalgeometrie auf schwarzem Grund: Motif und Motion-Event waehlen, daraus 4 abstrakte Loop-Szenen mit duennen Linien, Scanlines und sauberem Signal-Payoff bauen.',
+};
+
+const IDEA_SECTION_CONFIG: Array<{ key: StillframeIdeaListKey; label: string; useTarget?: 'ritual' | 'satire' | 'signal' | 'both' | 'all' }> = [
   { key: 'themes', label: 'Themen' },
   { key: 'characters', label: 'Charaktere' },
   { key: 'events', label: 'Ereignisse' },
   { key: 'actions', label: 'Handlungen' },
-  { key: 'stories', label: 'Geschichten', useTarget: 'both' },
+  { key: 'stories', label: 'Geschichten', useTarget: 'all' },
   { key: 'styles', label: 'Styles' },
-  { key: 'promptSeeds', label: 'Prompt Seeds', useTarget: 'both' },
+  { key: 'promptSeeds', label: 'Prompt Seeds', useTarget: 'all' },
   { key: 'presetSeeds', label: 'Preset Seeds' },
 ];
 
@@ -310,6 +332,27 @@ const copyText = async (value: string): Promise<boolean> => {
   }
 };
 
+const dataUrlToObjectUrl = (dataUrl: string): string => {
+  if (!dataUrl.startsWith('data:')) {
+    return dataUrl;
+  }
+
+  const [header, payload] = dataUrl.split(',');
+  const mimeType = header.match(/^data:([^;]+)/)?.[1] || 'application/octet-stream';
+  const binary = window.atob(payload || '');
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return URL.createObjectURL(new Blob([bytes], { type: mimeType }));
+};
+
+const revokeObjectUrl = (value?: string | null) => {
+  if (value?.startsWith('blob:')) {
+    URL.revokeObjectURL(value);
+  }
+};
+
 const readFileAsDataUrl = (file: File): Promise<string> => new Promise((resolve, reject) => {
   const reader = new FileReader();
   reader.onload = () => {
@@ -355,6 +398,19 @@ const rasterizeImageForAnalysis = async (dataUrl: string): Promise<{ analysisDat
 
 const createReferenceId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
+const normalizeVideoDurationSeconds = (value: unknown): number => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return DEFAULT_VIDEO_DURATION_SECONDS;
+  }
+
+  return SUPPORTED_VIDEO_DURATION_SECONDS.reduce((closest, duration) => {
+    const closestDistance = Math.abs(closest - parsed);
+    const durationDistance = Math.abs(duration - parsed);
+    return durationDistance < closestDistance ? duration : closest;
+  }, DEFAULT_VIDEO_DURATION_SECONDS);
+};
+
 const prepareReferenceImage = async (file: File): Promise<ReferenceImageAsset> => {
   if (file.type !== 'image/png' && file.type !== 'image/gif') {
     throw new Error(`${file.name}: Nur PNG und GIF werden unterstuetzt.`);
@@ -382,6 +438,7 @@ const prepareReferenceImage = async (file: File): Promise<ReferenceImageAsset> =
 const initScenes = (beats: SceneBeat[]): SceneState[] =>
   beats.map((b) => ({
     ...b,
+    durationSeconds: DEFAULT_VIDEO_DURATION_SECONDS,
     polishStatus: 'idle',
     sketchStatus: 'idle',
     sketchData: null,
@@ -389,6 +446,7 @@ const initScenes = (beats: SceneBeat[]): SceneState[] =>
     videoId: null,
     remixedFromVideoId: null,
     videoTransformMode: null,
+    videoTransformPrompt: '',
     videoBase64: null,
     gifData: null,
     errorPolish: null,
@@ -400,10 +458,31 @@ const initScenes = (beats: SceneBeat[]): SceneState[] =>
 // ── Component ────────────────────────────────────────────────────────────────
 
 interface StillframeHarnessProps {
-  onNavigateBack: () => void;
+  model: 'openai' | 'foundry';
+  setModel: (model: 'openai' | 'foundry') => void;
+  saveToLibrary: (item: LibraryItem) => Promise<void>;
+  onStorySaved: () => void;
+  preloadedStoryboard?: ARVStorySequence | null;
+  onAzureUsage?: (entry: Omit<AzureUsageEntry, 'id' | 'timestamp'>) => void;
+  onNavigateLibrary?: () => void;
+  onNavigateThumbnailStudio?: () => void;
+  libraryCount?: number;
 }
 
-export default function StillframeHarness({ onNavigateBack }: StillframeHarnessProps) {
+type StillframeWorkspace = 'stillframe' | 'storyComposer';
+
+export default function StillframeHarness({
+  model,
+  setModel,
+  saveToLibrary,
+  onStorySaved,
+  preloadedStoryboard,
+  onAzureUsage,
+  onNavigateLibrary,
+  onNavigateThumbnailStudio,
+  libraryCount = 0,
+}: StillframeHarnessProps) {
+  const [activeWorkspace, setActiveWorkspace] = useState<StillframeWorkspace>('stillframe');
   const [generationMode, setGenerationMode] = useState<GenerationMode>('ritual');
   const [outputMode, setOutputMode] = useState<GenerationMode | null>(null);
   const [concept, setConcept] = useState('');
@@ -412,6 +491,9 @@ export default function StillframeHarness({ onNavigateBack }: StillframeHarnessP
   const [keywords, setKeywords] = useState<string[]>([]);
   const [referenceImages, setReferenceImages] = useState<ReferenceImageAsset[]>([]);
   const [satirePrompt, setSatirePrompt] = useState('');
+  const [signalPrompt, setSignalPrompt] = useState('');
+  const [selectedSignalMotif, setSelectedSignalMotif] = useState<string>(arvMinimalSignalGeometryPreset.defaultMotifs[0]);
+  const [selectedSignalMotionEvent, setSelectedSignalMotionEvent] = useState<string>(arvMinimalSignalGeometryPreset.defaultMotionEvents[0]);
   const [satirePresetProfileId, setSatirePresetProfileId] = useState<string>(DEFAULT_STILLFRAME_SATIRE_PRESET_PROFILE_ID);
   const [satireSelectedElementIds, setSatireSelectedElementIds] = useState<string[]>(
     getStillframeSatirePresetProfile(DEFAULT_STILLFRAME_SATIRE_PRESET_PROFILE_ID)?.defaultElementIds ?? [],
@@ -435,7 +517,6 @@ export default function StillframeHarness({ onNavigateBack }: StillframeHarnessP
   const [storyConcept, setStoryConcept] = useState<string | null>(null);
   const [stylePresets, setStylePresets] = useState<StillframeStylePresetSummary[]>([]);
   const [referenceStyle, setReferenceStyle] = useState<StillframeReferenceStyleSummary | null>(null);
-  const [referenceKeywordInput, setReferenceKeywordInput] = useState('');
   const [ideaPack, setIdeaPack] = useState<StillframeIdeaPack | null>(null);
   const [tokenUsage, setTokenUsage] = useState<{ prompt: number; completion: number; total: number } | null>(null);
   const [runId, setRunId] = useState<string>('');
@@ -443,6 +524,9 @@ export default function StillframeHarness({ onNavigateBack }: StillframeHarnessP
   const [microMotion, setMicroMotion] = useState<string | null>(null);
   const [scenes, setScenes] = useState<SceneState[]>([]);
   const scenesRef = useRef<SceneState[]>([]);
+  const ideaSectionRef = useRef<HTMLElement | null>(null);
+  const stillframeSectionRef = useRef<HTMLDivElement | null>(null);
+  const storyComposerSectionRef = useRef<HTMLElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const referenceInputRef = useRef<HTMLInputElement>(null);
   const didBootstrapIdeaRemixRef = useRef(false);
@@ -453,19 +537,18 @@ export default function StillframeHarness({ onNavigateBack }: StillframeHarnessP
   const selectedSatirePresetProfile = getStillframeSatirePresetProfile(satirePresetProfileId)
     ?? getStillframeSatirePresetProfile(DEFAULT_STILLFRAME_SATIRE_PRESET_PROFILE_ID)
     ?? STILLFRAME_SATIRE_PRESET_PROFILES[0]!;
-  const displayedSatirePresetProfile = getStillframeSatirePresetProfile(appliedSatirePresetProfileId)
-    ?? selectedSatirePresetProfile;
   const selectedSatireElements = satireSelectedElementIds
     .map((elementId) => getStillframeSatireElement(elementId))
     .filter((element): element is NonNullable<ReturnType<typeof getStillframeSatireElement>> => Boolean(element));
-  const displayedSatireElements = (appliedSatireElementIds.length > 0 ? appliedSatireElementIds : satireSelectedElementIds)
-    .map((elementId) => getStillframeSatireElement(elementId))
-    .filter((element): element is NonNullable<ReturnType<typeof getStillframeSatireElement>> => Boolean(element));
   const canGenerateSatire = Boolean(selectedSatirePresetProfile);
+  const canGenerateSignal = Boolean(selectedSignalMotif && selectedSignalMotionEvent);
 
   // keep ref in sync so handleSketchAll can read latest prompts
   const updateScene = useCallback(
     (index: number, patch: Partial<SceneState>) => {
+      if ('gifData' in patch) {
+        revokeObjectUrl(scenesRef.current[index]?.gifData);
+      }
       setScenes((prev) => {
         const next = prev.map((s, i) => (i === index ? { ...s, ...patch } : s));
         scenesRef.current = next;
@@ -474,6 +557,10 @@ export default function StillframeHarness({ onNavigateBack }: StillframeHarnessP
     },
     [],
   );
+
+  useEffect(() => () => {
+    scenesRef.current.forEach((scene) => revokeObjectUrl(scene.gifData));
+  }, []);
 
   const flushKeywordInput = () => {
     if (!keywordInput.trim()) {
@@ -536,7 +623,6 @@ export default function StillframeHarness({ onNavigateBack }: StillframeHarnessP
     if (preparedImages.length > 0) {
       setReferenceImages((previous) => [...previous, ...preparedImages].slice(0, MAX_REFERENCE_IMAGES));
       setReferenceStyle(null);
-      setReferenceKeywordInput('');
     }
 
     if (files.length > availableSlots) {
@@ -553,53 +639,8 @@ export default function StillframeHarness({ onNavigateBack }: StillframeHarnessP
   const handleRemoveReferenceImage = (referenceId: string) => {
     setReferenceImages((previous) => previous.filter((referenceImage) => referenceImage.id !== referenceId));
     setReferenceStyle(null);
-    setReferenceKeywordInput('');
     setReferenceError(null);
   };
-
-  const handleReferenceStyleFieldChange = useCallback(
-    (field: keyof Omit<StillframeReferenceStyleSummary, 'keywords'>, value: string) => {
-      setReferenceStyle((previous) => (previous ? { ...previous, [field]: value } : previous));
-    },
-    [],
-  );
-
-  const flushReferenceKeywordInput = useCallback(() => {
-    if (!referenceStyle) {
-      setReferenceKeywordInput('');
-      return [];
-    }
-
-    if (!referenceKeywordInput.trim()) {
-      return referenceStyle.keywords;
-    }
-
-    const nextKeywords = mergeLimitedTokens(referenceStyle.keywords, referenceKeywordInput, MAX_REFERENCE_STYLE_KEYWORDS);
-    setReferenceStyle((previous) => (previous ? { ...previous, keywords: nextKeywords } : previous));
-    setReferenceKeywordInput('');
-    return nextKeywords;
-  }, [referenceKeywordInput, referenceStyle]);
-
-  const handleReferenceKeywordKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Enter' || event.key === ',') {
-      event.preventDefault();
-      flushReferenceKeywordInput();
-      return;
-    }
-
-    if (event.key === 'Backspace' && !referenceKeywordInput && referenceStyle && referenceStyle.keywords.length > 0) {
-      event.preventDefault();
-      setReferenceStyle((previous) => (previous ? { ...previous, keywords: previous.keywords.slice(0, -1) } : previous));
-    }
-  };
-
-  const handleRemoveReferenceKeyword = useCallback((keywordToRemove: string) => {
-    setReferenceStyle((previous) => (
-      previous
-        ? { ...previous, keywords: previous.keywords.filter((keyword) => keyword !== keywordToRemove) }
-        : previous
-    ));
-  }, []);
 
   const applyIdeaToRitual = useCallback((value: string) => {
     setGenerationMode('ritual');
@@ -611,6 +652,12 @@ export default function StillframeHarness({ onNavigateBack }: StillframeHarnessP
   const applyIdeaToSatire = useCallback((value: string) => {
     setGenerationMode('satire');
     setSatirePrompt(value);
+    setConceptError(null);
+  }, []);
+
+  const applyIdeaToSignal = useCallback((value: string) => {
+    setGenerationMode('signal');
+    setSignalPrompt(value);
     setConceptError(null);
   }, []);
 
@@ -659,7 +706,7 @@ export default function StillframeHarness({ onNavigateBack }: StillframeHarnessP
       prompt: trimmedSeed || pack.stories[0] || pack.promptSeeds[0] || pack.themes[0] || 'Stillframe Ideenpack',
       title: trimmedSeed
         ? `Stillframe Ideenpack - ${trimmedSeed.slice(0, 72)}`
-        : `Stillframe Ideenpack - ${pack.mode === 'satire' ? 'Satire' : 'Ritual'}`,
+        : `Stillframe Ideenpack - ${GENERATION_MODE_LABELS[pack.mode]}`,
       mode: pack.mode,
       seed: trimmedSeed || undefined,
       referenceSummary: referenceStyle?.summary || undefined,
@@ -748,7 +795,6 @@ export default function StillframeHarness({ onNavigateBack }: StillframeHarnessP
 
     if (options?.referenceStyle) {
       setReferenceStyle(options.referenceStyle);
-      setReferenceKeywordInput('');
     }
 
     try {
@@ -768,7 +814,7 @@ export default function StillframeHarness({ onNavigateBack }: StillframeHarnessP
       if (!res.ok) throw new Error(data.error || 'Idea generation failed.');
 
       setIdeaPack({
-        mode: data.mode === 'satire' ? 'satire' : 'ritual',
+        mode: data.mode === 'satire' ? 'satire' : data.mode === 'signal' ? 'signal' : 'ritual',
         themes: Array.isArray(data.themes) ? data.themes : [],
         characters: Array.isArray(data.characters) ? data.characters : [],
         events: Array.isArray(data.events) ? data.events : [],
@@ -807,7 +853,7 @@ export default function StillframeHarness({ onNavigateBack }: StillframeHarnessP
 
     try {
       const parsedPayload = JSON.parse(rawPayload) as StillframeIdeaRemixPayload;
-      const nextMode = parsedPayload.mode === 'satire' ? 'satire' : 'ritual';
+      const nextMode = parsedPayload.mode === 'satire' ? 'satire' : parsedPayload.mode === 'signal' ? 'signal' : 'ritual';
       const nextSeed = typeof parsedPayload.seed === 'string' ? parsedPayload.seed.trim() : '';
       const nextReferenceStyle = normalizeRemixReferenceStyle(parsedPayload.referenceStyle);
 
@@ -826,13 +872,13 @@ export default function StillframeHarness({ onNavigateBack }: StillframeHarnessP
   }, [normalizeRemixReferenceStyle, runGenerateIdeas]);
 
   const resetGeneratedOutput = useCallback(() => {
+    scenesRef.current.forEach((scene) => revokeObjectUrl(scene.gifData));
     scenesRef.current = [];
     setScenes([]);
     setStoryTitle(null);
     setStoryConcept(null);
     setStylePresets([]);
     setReferenceStyle(null);
-    setReferenceKeywordInput('');
     setSatireSketch(null);
     setAppliedSatirePresetProfileId(null);
     setAppliedSatireElementIds([]);
@@ -908,7 +954,6 @@ export default function StillframeHarness({ onNavigateBack }: StillframeHarnessP
       setKeywords(Array.isArray(data.keywords) ? data.keywords : preparedKeywords);
       setStylePresets(Array.isArray(data.stylePresets) ? data.stylePresets : []);
       setReferenceStyle(data.referenceStyle || null);
-      setReferenceKeywordInput('');
       applyUsageSummary(data.usage);
       const initialized = initScenes(data.scenes);
       scenesRef.current = initialized;
@@ -964,7 +1009,6 @@ export default function StillframeHarness({ onNavigateBack }: StillframeHarnessP
       setMicroMotion(data.microMotion || null);
       setStylePresets(Array.isArray(data.stylePresets) ? data.stylePresets : []);
       setReferenceStyle(data.referenceStyle || null);
-      setReferenceKeywordInput('');
       applyUsageSummary(data.usage);
 
       const initialized = initScenes(Array.isArray(data.scenes) ? data.scenes : []);
@@ -995,6 +1039,63 @@ export default function StillframeHarness({ onNavigateBack }: StillframeHarnessP
 
   const handleGenerateSatire = async () => {
     await runGenerateSatire(satirePrompt.trim());
+  };
+
+  const runGenerateSignal = useCallback(async (signalSeed: string, motif = selectedSignalMotif, motionEvent = selectedSignalMotionEvent) => {
+    if (!motif || !motionEvent) {
+      setConceptError('Bitte ein Signal-Motif und ein Motion-Event waehlen.');
+      return;
+    }
+
+    const referenceStyleOverride = buildReferenceStyleOverride();
+
+    setIsGeneratingConcept(true);
+    setConceptError(null);
+    setReferenceError(null);
+    resetGeneratedOutput();
+    const newRunId = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
+    setRunId(newRunId);
+
+    try {
+      const res = await fetch('/api/stillframe/signal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: signalSeed.trim() || undefined,
+          motif,
+          motionEvent,
+          referenceStyleOverride,
+          referenceImages: serializeReferenceImages(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Signal geometry generation failed.');
+
+      setStoryTitle(data.storyTitle || null);
+      setStoryConcept(data.storyConcept || null);
+      setSubject(data.subject || motif);
+      setMicroMotion(data.microMotion || motionEvent);
+      setKeywords(Array.isArray(data.keywords) ? data.keywords.slice(0, MAX_KEYWORDS) : ['minimal', 'signal', 'geometry']);
+      setStylePresets(Array.isArray(data.stylePresets) ? data.stylePresets : []);
+      setReferenceStyle(data.referenceStyle || null);
+      applyUsageSummary(data.usage);
+
+      const initialized = initScenes(Array.isArray(data.scenes) ? data.scenes : []);
+      scenesRef.current = initialized;
+      setScenes(initialized);
+      setOutputMode('signal');
+    } catch (err: any) {
+      if (referenceStyleOverride) {
+        setReferenceStyle(referenceStyleOverride);
+      }
+      setConceptError(err.message || 'Signal geometry generation failed.');
+    } finally {
+      setIsGeneratingConcept(false);
+    }
+  }, [applyUsageSummary, buildReferenceStyleOverride, resetGeneratedOutput, selectedSignalMotif, selectedSignalMotionEvent, serializeReferenceImages]);
+
+  const handleGenerateSignal = async () => {
+    await runGenerateSignal(signalPrompt.trim());
   };
 
   const handleGenerateVisionRitual = useCallback(async (vision: StillframeIdeaVision) => {
@@ -1034,6 +1135,21 @@ export default function StillframeHarness({ onNavigateBack }: StillframeHarnessP
     setSatirePrompt(satireSeed);
     await runGenerateSatire(satireSeed);
   }, [runGenerateSatire]);
+
+  const handleGenerateVisionSignal = useCallback(async (vision: StillframeIdeaVision) => {
+    const signalSeed = [
+      vision.title,
+      vision.theme,
+      vision.event,
+      vision.action,
+      vision.style,
+      vision.promptSeed,
+    ].filter((value) => value.trim().length > 0).join('. ');
+
+    setGenerationMode('signal');
+    setSignalPrompt(signalSeed);
+    await runGenerateSignal(signalSeed);
+  }, [runGenerateSignal]);
 
   // ── Sketch generation ──────────────────────────────────────────────────────
 
@@ -1082,7 +1198,7 @@ export default function StillframeHarness({ onNavigateBack }: StillframeHarnessP
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         prompt: scenePrompt,
-        seconds: 5,
+        seconds: normalizeVideoDurationSeconds(scenesRef.current[index]?.durationSeconds),
         beatIndex: index,
         stylePresetIds: stylePresets.map((preset) => preset.id),
         referenceStyle,
@@ -1128,8 +1244,8 @@ export default function StillframeHarness({ onNavigateBack }: StillframeHarnessP
       videoId: resolvedVideoId,
       remixedFromVideoId: remixVideoId ?? null,
       videoTransformMode: videoTransform ?? null,
-      videoBase64: videoData.videoBase64 || null,
-      gifData: gifData.gifData,
+      videoBase64: null,
+      gifData: dataUrlToObjectUrl(gifData.gifData),
       renderPromptDebug: videoData.debug || null,
     });
   }, [referenceStyle, storyConcept, storyTitle, stylePresets, updateScene]);
@@ -1158,6 +1274,7 @@ export default function StillframeHarness({ onNavigateBack }: StillframeHarnessP
   const handleVideoRemix = async (index: number) => {
     const scene = scenes[index];
     if (!scene?.prompt.trim() || !scene.videoId) return;
+    const transformPrompt = scene.videoTransformPrompt.trim() || scene.prompt;
 
     updateScene(index, {
       videoStatus: 'loading',
@@ -1167,7 +1284,7 @@ export default function StillframeHarness({ onNavigateBack }: StillframeHarnessP
     });
 
     try {
-      await renderVideoForScene(scene.prompt, index, { remixVideoId: scene.videoId, videoTransform: 'remix' });
+      await renderVideoForScene(transformPrompt, index, { remixVideoId: scene.videoId, videoTransform: 'remix' });
     } catch (err: any) {
       updateScene(index, { videoStatus: 'error', errorVideo: err.message || 'Video-Remix failed.' });
     }
@@ -1176,6 +1293,7 @@ export default function StillframeHarness({ onNavigateBack }: StillframeHarnessP
   const handleVideoExtension = async (index: number) => {
     const scene = scenes[index];
     if (!scene?.prompt.trim() || !scene.videoId) return;
+    const transformPrompt = scene.videoTransformPrompt.trim() || scene.prompt;
 
     updateScene(index, {
       videoStatus: 'loading',
@@ -1185,7 +1303,7 @@ export default function StillframeHarness({ onNavigateBack }: StillframeHarnessP
     });
 
     try {
-      await renderVideoForScene(scene.prompt, index, { remixVideoId: scene.videoId, videoTransform: 'extend' });
+      await renderVideoForScene(transformPrompt, index, { remixVideoId: scene.videoId, videoTransform: 'extend' });
     } catch (err: any) {
       updateScene(index, { videoStatus: 'error', errorVideo: err.message || 'Video-Extension failed.' });
     }
@@ -1198,11 +1316,30 @@ export default function StillframeHarness({ onNavigateBack }: StillframeHarnessP
       sketchStatus: 'idle',
       sketchData: null,
       videoStatus: 'idle',
+      videoId: null,
+      remixedFromVideoId: null,
       videoBase64: null,
       gifData: null,
       videoTransformMode: null,
+      videoTransformPrompt: '',
       errorPolish: null,
       errorSketch: null,
+      errorVideo: null,
+      renderPromptDebug: null,
+    });
+  };
+
+  const handleVideoTransformPromptChange = (index: number, value: string) => {
+    updateScene(index, { videoTransformPrompt: value });
+  };
+
+  const handleDurationChange = (index: number, value: number) => {
+    updateScene(index, {
+      durationSeconds: normalizeVideoDurationSeconds(value),
+      videoStatus: 'idle',
+      videoBase64: null,
+      gifData: null,
+      videoTransformMode: null,
       errorVideo: null,
       renderPromptDebug: null,
     });
@@ -1221,7 +1358,7 @@ export default function StillframeHarness({ onNavigateBack }: StillframeHarnessP
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          mode: outputMode === 'satire' ? 'satire' : 'ritual',
+          mode: outputMode === 'satire' ? 'satire' : outputMode === 'signal' ? 'signal' : 'ritual',
           beat: scene.beat,
           title: scene.title,
           motion: scene.motion,
@@ -1353,47 +1490,121 @@ export default function StillframeHarness({ onNavigateBack }: StillframeHarnessP
   const activeVideoBatchIndex = scenes.findIndex((scene) => scene.videoStatus === 'loading' || scene.videoStatus === 'converting');
   const hasActiveVideoRender = scenes.some((scene) => scene.videoStatus === 'loading' || scene.videoStatus === 'converting');
 
+  const scrollToPanel = useCallback((target: 'ideas' | StillframeWorkspace) => {
+    const targetRef = target === 'ideas'
+      ? ideaSectionRef
+      : target === 'storyComposer'
+        ? storyComposerSectionRef
+        : stillframeSectionRef;
+
+    targetRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
+
+  const handleWorkspaceChange = (nextWorkspace: StillframeWorkspace) => {
+    setActiveWorkspace(nextWorkspace);
+    window.requestAnimationFrame(() => scrollToPanel(nextWorkspace));
+  };
+
   return (
     <div
       className="min-h-screen signal-shell bg-[#02040e]"
     >
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <header className="border-b border-[rgba(114,228,255,0.14)] bg-[rgba(4,6,16,0.88)] backdrop-blur-xl px-5 py-4">
-        <div className="mx-auto max-w-[1400px] flex items-center gap-4">
-          <button
-            type="button"
-            onClick={onNavigateBack}
-            className="flex items-center gap-2 rounded-xl border border-[rgba(114,228,255,0.18)] bg-[rgba(10,18,35,0.7)] px-3 py-2 text-xs font-semibold text-[#8ea6c3] transition hover:text-[#72e4ff] hover:border-[rgba(114,228,255,0.35)]"
-          >
-            <ArrowLeft size={14} />
-            Studio
-          </button>
-
-          <div className="flex items-center gap-3">
+      <header className="sticky top-0 z-30 border-b border-[rgba(114,228,255,0.14)] bg-[rgba(4,6,16,0.9)] px-5 py-3 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-[1500px] flex-wrap items-center gap-3">
+          <div className="flex min-w-[220px] items-center gap-3">
             <div className="h-7 w-px bg-[rgba(114,228,255,0.12)]" />
+            <div>
+              <div className="font-mono text-[10px] uppercase tracking-[0.24em] text-[#36516e]">Hyroglyphs</div>
+              <div className="font-mono text-xs font-semibold text-[#c8ddf0]">Stillframe Studio</div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-[rgba(114,228,255,0.12)] bg-[rgba(7,14,28,0.78)] px-2 py-2">
+            <label className="sr-only" htmlFor="stillframe-workspace-select">Arbeitsbereich</label>
+            <div className="relative">
+              <select
+                id="stillframe-workspace-select"
+                value={activeWorkspace}
+                onChange={(event) => handleWorkspaceChange(event.target.value as StillframeWorkspace)}
+                className="h-9 appearance-none rounded-xl border border-[rgba(114,228,255,0.16)] bg-[#071221] py-2 pl-3 pr-8 font-mono text-[11px] font-semibold text-[#72e4ff] outline-none transition focus:border-[rgba(114,228,255,0.42)]"
+              >
+                <option value="stillframe">Stillframe Szenen</option>
+                <option value="storyComposer">Story GIF Composer</option>
+              </select>
+              <ChevronsDown size={13} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#4a7090]" />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => scrollToPanel('ideas')}
+              className="rounded-xl border border-[rgba(168,118,255,0.18)] bg-[rgba(30,16,54,0.64)] px-3 py-2 font-mono text-[10px] font-semibold text-[#c7a7ff] transition hover:border-[rgba(168,118,255,0.34)]"
+            >
+              Ideen
+            </button>
+            <button
+              type="button"
+              onClick={() => handleWorkspaceChange('stillframe')}
+              className="rounded-xl border border-[rgba(114,228,255,0.16)] bg-[rgba(10,26,46,0.6)] px-3 py-2 font-mono text-[10px] font-semibold text-[#8ea6c3] transition hover:text-[#72e4ff]"
+            >
+              4 Szenen
+            </button>
+            <button
+              type="button"
+              onClick={() => handleWorkspaceChange('storyComposer')}
+              className="rounded-xl border border-[rgba(232,169,74,0.16)] bg-[rgba(42,28,6,0.56)] px-3 py-2 font-mono text-[10px] font-semibold text-[#e8c16a] transition hover:border-[rgba(232,169,74,0.32)]"
+            >
+              ZIP Composer
+            </button>
+          </div>
+
+          {onNavigateLibrary && (
+            <button
+              type="button"
+              onClick={onNavigateLibrary}
+              className="flex items-center gap-2 rounded-xl border border-[rgba(114,228,255,0.18)] bg-[rgba(10,18,35,0.7)] px-3 py-2 text-xs font-semibold text-[#8ea6c3] transition hover:border-[rgba(114,228,255,0.35)] hover:text-[#72e4ff]"
+            >
+              <BookOpen size={14} />
+              Bibliothek
+              {libraryCount > 0 && (
+                <span className="rounded-full bg-[#0e3a5c] px-1.5 py-0.5 font-mono text-[10px] text-[#72e4ff]">{libraryCount}</span>
+              )}
+            </button>
+          )}
+
+          {onNavigateThumbnailStudio && (
+            <button
+              type="button"
+              onClick={onNavigateThumbnailStudio}
+              className="flex items-center gap-2 rounded-xl border border-[rgba(232,193,106,0.2)] bg-[rgba(42,28,6,0.56)] px-3 py-2 text-xs font-semibold text-[#e8c16a] transition hover:border-[rgba(232,193,106,0.4)] hover:text-[#ffd980]"
+            >
+              <Sparkles size={14} />
+              Thumbnail Studio
+            </button>
+          )}
+
+          <div className="ml-auto flex items-center gap-3">
             <span className="font-mono text-[11px] uppercase tracking-[0.28em] text-[#4a7090]">Azure OpenAI Foundry</span>
             <span className="rounded-full border border-[rgba(114,228,255,0.2)] bg-[rgba(20,40,70,0.6)] px-2.5 py-0.5 font-mono text-[10px] text-[#72e4ff]">
-              {generationMode === 'satire' ? 'Stillframe Satire' : 'Stillframe Rituals'}
+              {GENERATION_MODE_LABELS[generationMode]}
             </span>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1400px] px-4 py-8 space-y-10">
+      <main className="mx-auto max-w-[1500px] px-4 py-8 space-y-8">
 
         {/* ── Hero ─────────────────────────────────────────────────────────── */}
         <div className="space-y-2">
           <h1 className="font-mono text-2xl font-bold tracking-tight text-[#f3f8ff]">
-            {generationMode === 'satire' ? 'Stillframe Satire Sketch' : 'Stillframe Rituals'}
+            {GENERATION_MODE_LABELS[generationMode]}
           </h1>
           <p className="text-sm text-[#4a6a8a] max-w-2xl">
-            {generationMode === 'satire'
-              ? 'Einfacher ARV-Satiremodus mit zwei Figuren, einem optionalen Satire-Fokus und direkt generierten Sketch- plus GIF-Szenen.'
-              : 'Hypnotic micro-motion stop-frame loops via Azure OpenAI Foundry. Gib 3 bis 5 Schlagwoerter, ein freies Konzept oder Referenzbilder an, lass dir passende Stil-Presets und 4 diverse Szenen-Prompts bauen und rendere daraus GIF-Loops.'}
+            {GENERATION_MODE_DESCRIPTIONS[generationMode]}
           </p>
         </div>
 
-        <section className="rounded-[24px] border border-[rgba(168,118,255,0.16)] bg-[linear-gradient(180deg,rgba(22,12,40,0.72),rgba(7,12,24,0.8))] p-6 space-y-5 backdrop-blur-sm">
+        <section ref={ideaSectionRef} className="scroll-mt-24 rounded-[24px] border border-[rgba(168,118,255,0.16)] bg-[linear-gradient(180deg,rgba(22,12,40,0.72),rgba(7,12,24,0.8))] p-5 space-y-5 backdrop-blur-sm">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="space-y-2 max-w-3xl">
               <div className="font-mono text-[11px] uppercase tracking-[0.24em] text-[#8f74c9]">
@@ -1446,7 +1657,9 @@ export default function StillframeHarness({ onNavigateBack }: StillframeHarnessP
                 rows={3}
                 placeholder={generationMode === 'satire'
                   ? 'z. B. pressure-core office meltdown, glass engine with procedural panic, signal field doing dry visual comedy'
-                  : 'z. B. breathing storm lab above black water, micro-city under magnetic weather, kinetic aperture with delayed residue'}
+                  : generationMode === 'signal'
+                    ? 'z. B. black CRT barcode breathing once, cyan-magenta orbital frame locking into a central dot'
+                    : 'z. B. breathing storm lab above black water, micro-city under magnetic weather, kinetic aperture with delayed residue'}
                 className="w-full resize-none rounded-xl border border-[rgba(168,118,255,0.18)] bg-[rgba(10,10,24,0.82)] px-4 py-3 font-mono text-sm text-[#f3eaff] placeholder-[#4d4162] outline-none transition focus:border-[rgba(199,167,255,0.55)] focus:ring-1 focus:ring-[rgba(199,167,255,0.24)]"
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' && !event.shiftKey) {
@@ -1460,7 +1673,7 @@ export default function StillframeHarness({ onNavigateBack }: StillframeHarnessP
             <div className="rounded-[18px] border border-[rgba(168,118,255,0.14)] bg-[rgba(12,14,28,0.78)] p-4 space-y-3">
               <div className="font-mono text-[11px] uppercase tracking-[0.2em] text-[#705d92]">Generator Status</div>
               <div className="space-y-2 font-mono text-[11px] leading-relaxed text-[#8f74c9]">
-                <div>Modus: <span className="text-[#f3eaff]">{generationMode === 'satire' ? 'Satire Vision Lab' : 'Ritual Vision Lab'}</span></div>
+                <div>Modus: <span className="text-[#f3eaff]">{GENERATION_MODE_STATUS_LABELS[generationMode]}</span></div>
                 <div>Keywords: <span className="text-[#c7a7ff]">{keywords.length > 0 ? keywords.join(', ') : 'keine'}</span></div>
                 <div>Referenz-DNA: <span className="text-[#c7a7ff]">{referenceStyle ? 'aktiv' : 'keine'}</span></div>
                 <div>Seed: <span className="text-[#c7a7ff]">{ideaSeed.trim() || 'frischer Lauf ohne expliziten Seed'}</span></div>
@@ -1498,6 +1711,7 @@ export default function StillframeHarness({ onNavigateBack }: StillframeHarnessP
                     allowUse={section.useTarget}
                     onUseRitual={applyIdeaToRitual}
                     onUseSatire={applyIdeaToSatire}
+                    onUseSignal={applyIdeaToSignal}
                   />
                 ))}
               </div>
@@ -1514,8 +1728,10 @@ export default function StillframeHarness({ onNavigateBack }: StillframeHarnessP
                         vision={vision}
                         onUseRitual={applyIdeaToRitual}
                         onUseSatire={applyIdeaToSatire}
+                        onUseSignal={applyIdeaToSignal}
                         onGenerateRitual={handleGenerateVisionRitual}
                         onGenerateSatire={handleGenerateVisionSatire}
+                        onGenerateSignal={handleGenerateVisionSignal}
                         isGenerating={isGeneratingConcept}
                       />
                     ))}
@@ -1525,6 +1741,12 @@ export default function StillframeHarness({ onNavigateBack }: StillframeHarnessP
             </div>
           )}
         </section>
+
+        {/* ── Compose + Storyboard (two-column studio) ─────────────────────── */}
+        <div ref={stillframeSectionRef} className="grid scroll-mt-24 gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] xl:items-start">
+
+        {/* Left column · Compose controls */}
+        <div className="space-y-6 xl:sticky xl:top-6">
 
         {/* ── Concept input ─────────────────────────────────────────────────── */}
         <div className="rounded-[24px] border border-[rgba(114,228,255,0.12)] bg-[rgba(6,12,24,0.7)] p-6 space-y-4 backdrop-blur-sm">
@@ -1537,6 +1759,7 @@ export default function StillframeHarness({ onNavigateBack }: StillframeHarnessP
               {([
                 { id: 'ritual', label: 'Ritual Story Beats' },
                 { id: 'satire', label: 'Satire Sketch' },
+                { id: 'signal', label: 'Signal Geometry' },
               ] as const).map((mode) => (
                 <button
                   key={mode.id}
@@ -1802,6 +2025,186 @@ export default function StillframeHarness({ onNavigateBack }: StillframeHarnessP
             </div>
           )}
             </>
+          ) : generationMode === 'signal' ? (
+            <>
+              <div className="grid gap-4">
+                <div className="rounded-[18px] border border-[rgba(0,245,212,0.14)] bg-[rgba(4,14,18,0.78)] p-4 space-y-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-[#4a8f8a]">Preset Engine</div>
+                      <div className="mt-1 font-mono text-sm font-semibold text-[#d9fff7]">{arvMinimalSignalGeometryPreset.name}</div>
+                    </div>
+                    <span className="rounded-full border border-[rgba(0,245,212,0.18)] bg-[rgba(0,245,212,0.08)] px-2.5 py-1 font-mono text-[10px] text-[#6ff7e2]">
+                      black CRT · thin lines · one event
+                    </span>
+                  </div>
+                  <p className="text-[11px] leading-relaxed text-[#5f8d91]">
+                    Minimalistische schwarze Signalbuehne mit einem zentralen geometrischen Objekt, duennen cyan-magenta/ivory Linien, analogem CRT-Grain und einem sauberen Reveal-Shift-Hold-Return Loop.
+                  </p>
+                </div>
+
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <label className="space-y-2">
+                    <span className="block font-mono text-[11px] uppercase tracking-[0.22em] text-[#4a8f8a]">Motif</span>
+                    <div className="relative">
+                      <select
+                        value={selectedSignalMotif}
+                        onChange={(event) => setSelectedSignalMotif(event.target.value)}
+                        className="w-full appearance-none rounded-xl border border-[rgba(0,245,212,0.18)] bg-[#041014] px-4 py-3 pr-9 font-mono text-[11px] text-[#d9fff7] outline-none transition focus:border-[#48f6e8]"
+                      >
+                        {arvMinimalSignalGeometryPreset.defaultMotifs.map((motif) => (
+                          <option key={motif} value={motif}>{motif}</option>
+                        ))}
+                      </select>
+                      <ChevronsDown size={13} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#4a8f8a]" />
+                    </div>
+                  </label>
+
+                  <label className="space-y-2">
+                    <span className="block font-mono text-[11px] uppercase tracking-[0.22em] text-[#4a8f8a]">Motion Event</span>
+                    <div className="relative">
+                      <select
+                        value={selectedSignalMotionEvent}
+                        onChange={(event) => setSelectedSignalMotionEvent(event.target.value)}
+                        className="w-full appearance-none rounded-xl border border-[rgba(0,245,212,0.18)] bg-[#041014] px-4 py-3 pr-9 font-mono text-[11px] text-[#d9fff7] outline-none transition focus:border-[#48f6e8]"
+                      >
+                        {arvMinimalSignalGeometryPreset.defaultMotionEvents.map((motionEvent) => (
+                          <option key={motionEvent} value={motionEvent}>{motionEvent}</option>
+                        ))}
+                      </select>
+                      <ChevronsDown size={13} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#4a8f8a]" />
+                    </div>
+                  </label>
+                </div>
+
+                <label className="space-y-2">
+                  <span className="block font-mono text-[11px] uppercase tracking-[0.22em] text-[#4a8f8a]">Optionaler Signal Seed</span>
+                  <textarea
+                    value={signalPrompt}
+                    onChange={(event) => setSignalPrompt(event.target.value)}
+                    placeholder="z. B. black-on-black broadcast alignment mark with one cyan pulse and magenta edge split"
+                    rows={3}
+                    className="w-full resize-none rounded-xl border border-[rgba(0,245,212,0.18)] bg-[#041014] px-4 py-3 font-mono text-sm text-[#d9fff7] placeholder-[#315d60] outline-none transition focus:border-[#48f6e8] focus:ring-1 focus:ring-[rgba(72,246,232,0.2)]"
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' && !event.shiftKey) {
+                        event.preventDefault();
+                        void handleGenerateSignal();
+                      }
+                    }}
+                  />
+                </label>
+
+                <div className="space-y-3 rounded-[18px] border border-[rgba(0,245,212,0.12)] bg-[rgba(2,16,18,0.68)] p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <label className="font-mono text-[11px] uppercase tracking-[0.22em] text-[#4a8f8a]">
+                      Signal Referenzbilder PNG / GIF
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <span className={`rounded-full border px-2 py-0.5 font-mono text-[10px] ${referenceImages.length > 0 ? 'border-[rgba(0,245,212,0.24)] bg-[rgba(0,245,212,0.08)] text-[#6ff7e2]' : 'border-[rgba(0,245,212,0.12)] bg-[rgba(4,20,22,0.6)] text-[#4a8f8a]'}`}>
+                        {referenceImages.length}/{MAX_REFERENCE_IMAGES}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => referenceInputRef.current?.click()}
+                        disabled={isPreparingReferences || referenceImages.length >= MAX_REFERENCE_IMAGES}
+                        className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,245,212,0.2)] bg-[rgba(4,42,44,0.72)] px-4 py-2 font-mono text-[11px] font-semibold text-[#6ff7e2] transition hover:bg-[rgba(8,56,58,0.86)] disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {isPreparingReferences ? <Loader2 size={13} className="animate-spin" /> : <ImagePlus size={13} />}
+                        Bilder hochladen
+                      </button>
+                    </div>
+                  </div>
+
+                  <input
+                    ref={referenceInputRef}
+                    type="file"
+                    accept="image/png,image/gif"
+                    multiple
+                    className="hidden"
+                    onChange={handleReferenceFilesSelected}
+                  />
+
+                  <p className="text-[11px] leading-relaxed text-[#5f8d91]">
+                    Signal Geometry liest Referenzbilder als Stil- und Formsignal: Palette, Liniengewicht, Oberflaechenrauschen, Kontrast und Bewegungs-DNA werden in die vier abstrakten Beats uebernommen.
+                  </p>
+
+                  {referenceImages.length > 0 && (
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                      {referenceImages.map((referenceImage) => (
+                        <article
+                          key={referenceImage.id}
+                          className="overflow-hidden rounded-[16px] border border-[rgba(0,245,212,0.12)] bg-[rgba(3,12,16,0.82)]"
+                        >
+                          <div className="aspect-video overflow-hidden border-b border-[rgba(0,245,212,0.08)] bg-[#010708]">
+                            <img
+                              src={referenceImage.previewDataUrl}
+                              alt={referenceImage.name}
+                              className="h-full w-full object-cover"
+                            />
+                          </div>
+                          <div className="space-y-2 px-3 py-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="truncate font-mono text-[11px] text-[#d9fff7]">{referenceImage.name}</div>
+                                <div className="font-mono text-[10px] text-[#4a8f8a]">
+                                  {referenceImage.source.toUpperCase()} · {referenceImage.width}×{referenceImage.height}
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveReferenceImage(referenceImage.id)}
+                                className="rounded-full border border-[rgba(0,245,212,0.14)] p-1 text-[#4a8f8a] transition hover:border-[rgba(0,245,212,0.28)] hover:text-[#d9fff7]"
+                                aria-label={`${referenceImage.name} entfernen`}
+                              >
+                                <X size={12} />
+                              </button>
+                            </div>
+
+                            <div className="font-mono text-[10px] leading-relaxed text-[#5f8d91]">
+                              {referenceImage.source === 'gif'
+                                ? 'GIF-Stilanker: erstes normalisiertes Loop-Still wird als Signal-DNA analysiert.'
+                                : 'PNG-Stilanker: Form, Kanten, Licht und Rauschen werden fuer Signal-DNA analysiert.'}
+                            </div>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+
+                  {referenceError && (
+                    <div className="flex items-start gap-2 rounded-lg border border-[rgba(255,80,60,0.2)] bg-[rgba(255,80,60,0.1)] px-4 py-3 text-xs text-[#ff6a4f]">
+                      <TriangleAlert size={14} className="mt-0.5 shrink-0" />
+                      {referenceError}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleGenerateSignal}
+                    disabled={isGeneratingConcept || !canGenerateSignal}
+                    className="flex items-center gap-2 rounded-xl border border-[rgba(0,245,212,0.28)] bg-[rgba(4,42,44,0.82)] px-5 py-2.5 font-mono text-xs font-semibold text-[#6ff7e2] transition hover:bg-[rgba(8,56,58,0.9)] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {isGeneratingConcept ? (
+                      <><Loader2 size={14} className="animate-spin" />Generating signal…</>
+                    ) : (
+                      <><Sparkles size={14} />Generate Signal Beats</>
+                    )}
+                  </button>
+                  <div className="font-mono text-[10px] leading-relaxed text-[#4a8f8a]">
+                    Preset-Dauerlogik: Sora 4/8/12s · locked camera · no text · no characters · no strobe
+                  </div>
+                </div>
+
+                {conceptError && (
+                  <div className="flex items-start gap-2 rounded-lg bg-[rgba(255,80,60,0.1)] border border-[rgba(255,80,60,0.2)] px-4 py-3 text-xs text-[#ff6a4f]">
+                    <TriangleAlert size={14} className="mt-0.5 shrink-0" />
+                    {conceptError}
+                  </div>
+                )}
+              </div>
+            </>
           ) : (
             <>
               <div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
@@ -2043,313 +2446,11 @@ export default function StillframeHarness({ onNavigateBack }: StillframeHarnessP
             </>
           )}
         </div>
+        {/* End left column */}
+        </div>
 
-        {(scenes.length > 0 || stylePresets.length > 0 || storyConcept || storyTitle || subject || referenceStyle || satireSketch) && (
-          <section className="rounded-[24px] border border-[rgba(114,228,255,0.1)] bg-[rgba(5,10,20,0.72)] px-6 py-5 backdrop-blur-sm space-y-5">
-            <div className="flex flex-wrap items-start justify-between gap-6">
-              <div className="max-w-3xl space-y-2">
-                <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-[#4a7090]">
-                  {outputMode === 'satire' ? 'Generated Satire Sketch' : 'Generated Story'}
-                </div>
-                {storyTitle && (
-                  <h2 className="font-mono text-xl font-semibold text-[#f3f8ff]">
-                    {storyTitle}
-                  </h2>
-                )}
-                {storyConcept && (
-                  <p className="text-sm leading-relaxed text-[#8ea6c3] max-w-2xl">
-                    {storyConcept}
-                  </p>
-                )}
-                {outputMode === 'ritual' && keywords.length > 0 && (
-                  <div className="flex flex-wrap gap-2 pt-1">
-                    {keywords.map((keyword) => (
-                      <span
-                        key={`generated-${keyword}`}
-                        className="rounded-full border border-[rgba(114,228,255,0.18)] bg-[rgba(18,34,58,0.66)] px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-[#72e4ff]"
-                      >
-                        {keyword}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                {referenceImages.length > 0 && (
-                  <div className="font-mono text-[10px] text-[#36516e]">
-                    {referenceImages.length} Referenzbild{referenceImages.length === 1 ? '' : 'er'} aktiv
-                  </div>
-                )}
-              </div>
-
-              <div className="min-w-[220px] space-y-1">
-                {subject && (
-                  <div className="font-mono text-[11px] text-[#4a7090]">
-                    Subject: <span className="text-[#c8ddf0]">{subject}</span>
-                  </div>
-                )}
-                {microMotion && (
-                  <div className="font-mono text-[11px] leading-relaxed text-[#4a7090]">
-                    Micro-motion: <span className="text-[#c8ddf0]">{microMotion}</span>
-                  </div>
-                )}
-                {tokenUsage && (
-                  <div className="font-mono text-[10px] text-[#36516e]">
-                    {tokenUsage.total.toLocaleString()} Tokens via Foundry Story Model
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {outputMode === 'satire' && satireSketch && (
-              <div className="space-y-4 rounded-[20px] border border-[rgba(114,228,255,0.12)] bg-[rgba(7,14,28,0.8)] px-4 py-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-[#4a7090]">
-                    ARV Satire Sketch
-                  </div>
-                  <span className="rounded-full border border-[rgba(232,169,74,0.18)] bg-[rgba(48,33,11,0.42)] px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-[#e8c16a]">
-                    {satireSketch.satireTarget}
-                  </span>
-                </div>
-
-                <div className="space-y-1">
-                  <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#36516e]">
-                    Setting
-                  </div>
-                  <p className="text-sm leading-relaxed text-[#c8ddf0]">
-                    {satireSketch.setting}
-                  </p>
-                </div>
-
-                <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
-                  <div className="space-y-3">
-                    <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#36516e]">
-                      Dialog
-                    </div>
-                    <div className="space-y-2">
-                      {satireSketch.dialogue.map((line, index) => (
-                        <div
-                          key={`${line.characterId}-${index}`}
-                          className="rounded-xl border border-[rgba(114,228,255,0.08)] bg-[rgba(9,18,34,0.76)] px-3 py-3"
-                        >
-                          <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#72e4ff]">
-                            {ARV_CHARACTERS.find((character) => character.id === line.characterId)?.name ?? line.characterId}
-                          </div>
-                          <p className="mt-1 text-sm leading-relaxed text-[#c8ddf0]">
-                            {line.line}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div className="rounded-[18px] border border-[rgba(114,228,255,0.1)] bg-[rgba(8,16,30,0.82)] px-4 py-4 space-y-2">
-                      <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#36516e]">
-                        Abschluss
-                      </div>
-                      <p className="text-sm leading-relaxed text-[#c8ddf0]">
-                        {satireSketch.conclusion}
-                      </p>
-                    </div>
-                    <div className="rounded-[18px] border border-[rgba(114,228,255,0.1)] bg-[rgba(8,16,30,0.82)] px-4 py-4 space-y-2">
-                      <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#36516e]">
-                        Voreinstellung
-                      </div>
-                      <div className="space-y-2 font-mono text-[10px] leading-relaxed text-[#4a7090]">
-                        <div className="text-[#c8ddf0]">{displayedSatirePresetProfile.name}</div>
-                        <div>{displayedSatirePresetProfile.description}</div>
-                        <div className="flex flex-wrap gap-2 pt-1">
-                          {displayedSatirePresetProfile.presetIds.map((presetId) => (
-                            <span
-                              key={`applied-${presetId}`}
-                              className="rounded-full border border-[rgba(114,228,255,0.16)] bg-[rgba(18,34,58,0.56)] px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-[#72e4ff]"
-                            >
-                              {presetId}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="rounded-[18px] border border-[rgba(114,228,255,0.1)] bg-[rgba(8,16,30,0.82)] px-4 py-4 space-y-2">
-                      <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#36516e]">
-                        Elemente
-                      </div>
-                      <div className="space-y-2 font-mono text-[10px] leading-relaxed text-[#4a7090]">
-                        {SATIRE_ELEMENT_CATEGORY_ORDER.map((category) => {
-                          const selectedElement = displayedSatireElements.find((element) => element.category === category);
-                          if (!selectedElement) {
-                            return null;
-                          }
-
-                          return (
-                            <div key={`displayed-${category}`}>
-                              <div className="text-[#36516e]">{SATIRE_ELEMENT_CATEGORY_LABELS[category]}</div>
-                              <div className="text-[#c8ddf0]">{selectedElement.label}</div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {referenceStyle && (
-              <div className="space-y-3 rounded-[20px] border border-[rgba(114,228,255,0.12)] bg-[rgba(7,14,28,0.8)] px-4 py-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-[#4a7090]">
-                      {outputMode === 'satire' ? 'Editable Satire Reference DNA' : 'Editable Reference DNA'}
-                    </div>
-                    <div className="mt-1 font-mono text-[10px] leading-relaxed text-[#36516e]">
-                      Kurzregeln und Chips koennen angepasst werden. Die DNA wird beim naechsten Generate und beim GPT-Polish erneut mitgesendet.
-                    </div>
-                  </div>
-                  {referenceImages.length > 0 && (
-                    <span className="rounded-full border border-[rgba(114,228,255,0.16)] bg-[rgba(18,34,58,0.56)] px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-[#72e4ff]">
-                      {referenceImages.length} Referenz{referenceImages.length === 1 ? '' : 'en'} aktiv
-                    </span>
-                  )}
-                </div>
-                <div className="grid gap-3 xl:grid-cols-[1.2fr_1fr]">
-                  <label className="space-y-2 rounded-[16px] border border-[rgba(114,228,255,0.1)] bg-[rgba(8,16,30,0.72)] p-3">
-                    <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#36516e]">Summary</span>
-                    <textarea
-                      value={referenceStyle.summary}
-                      onChange={(event) => handleReferenceStyleFieldChange('summary', event.target.value)}
-                      rows={4}
-                      className="w-full resize-none rounded-lg border border-[rgba(114,228,255,0.12)] bg-[#040d1a] px-3 py-2 font-mono text-[11px] leading-relaxed text-[#c8ddf0] outline-none transition focus:border-[rgba(114,228,255,0.3)]"
-                    />
-                  </label>
-                  <label className="space-y-2 rounded-[16px] border border-[rgba(114,228,255,0.1)] bg-[rgba(8,16,30,0.72)] p-3">
-                    <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#36516e]">Prompt DNA</span>
-                    <textarea
-                      value={referenceStyle.promptDNA}
-                      onChange={(event) => handleReferenceStyleFieldChange('promptDNA', event.target.value)}
-                      rows={4}
-                      className="w-full resize-none rounded-lg border border-[rgba(114,228,255,0.12)] bg-[#040d1a] px-3 py-2 font-mono text-[11px] leading-relaxed text-[#c8ddf0] outline-none transition focus:border-[rgba(114,228,255,0.3)]"
-                    />
-                  </label>
-                </div>
-                <div className="grid gap-3 lg:grid-cols-3">
-                  <label className="space-y-2 rounded-[16px] border border-[rgba(114,228,255,0.1)] bg-[rgba(8,16,30,0.72)] p-3">
-                    <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#36516e]">Subject Focus</span>
-                    <input
-                      value={referenceStyle.subjectFocus}
-                      onChange={(event) => handleReferenceStyleFieldChange('subjectFocus', event.target.value)}
-                      className="w-full rounded-lg border border-[rgba(114,228,255,0.12)] bg-[#040d1a] px-3 py-2 font-mono text-[11px] text-[#c8ddf0] outline-none transition focus:border-[rgba(114,228,255,0.3)]"
-                    />
-                  </label>
-                  <label className="space-y-2 rounded-[16px] border border-[rgba(114,228,255,0.1)] bg-[rgba(8,16,30,0.72)] p-3">
-                    <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#36516e]">Palette</span>
-                    <input
-                      value={referenceStyle.palette}
-                      onChange={(event) => handleReferenceStyleFieldChange('palette', event.target.value)}
-                      className="w-full rounded-lg border border-[rgba(114,228,255,0.12)] bg-[#040d1a] px-3 py-2 font-mono text-[11px] text-[#c8ddf0] outline-none transition focus:border-[rgba(114,228,255,0.3)]"
-                    />
-                  </label>
-                  <label className="space-y-2 rounded-[16px] border border-[rgba(114,228,255,0.1)] bg-[rgba(8,16,30,0.72)] p-3">
-                    <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#36516e]">Motion Rule</span>
-                    <input
-                      value={referenceStyle.motion}
-                      onChange={(event) => handleReferenceStyleFieldChange('motion', event.target.value)}
-                      className="w-full rounded-lg border border-[rgba(114,228,255,0.12)] bg-[#040d1a] px-3 py-2 font-mono text-[11px] text-[#c8ddf0] outline-none transition focus:border-[rgba(114,228,255,0.3)]"
-                    />
-                  </label>
-                </div>
-                <div className="space-y-3 rounded-[16px] border border-[rgba(114,228,255,0.1)] bg-[rgba(8,16,30,0.72)] p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#36516e]">DNA Chips</span>
-                    <span className="font-mono text-[10px] text-[#36516e]">max. {MAX_REFERENCE_STYLE_KEYWORDS}</span>
-                  </div>
-                  {referenceStyle.keywords.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {referenceStyle.keywords.map((keyword) => (
-                        <button
-                          key={`reference-style-${keyword}`}
-                          type="button"
-                          onClick={() => handleRemoveReferenceKeyword(keyword)}
-                          className="inline-flex items-center gap-1 rounded-full border border-[rgba(114,228,255,0.16)] bg-[rgba(18,34,58,0.56)] px-2 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-[#72e4ff] transition hover:border-[rgba(114,228,255,0.3)] hover:text-[#c8f4ff]"
-                        >
-                          {keyword}
-                          <X size={10} />
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="font-mono text-[10px] text-[#36516e]">
-                      Noch keine DNA-Chips gesetzt. Fuege kurze Stilregeln oder Materialsignale hinzu.
-                    </div>
-                  )}
-                  <div className="flex flex-col gap-2 sm:flex-row">
-                    <input
-                      value={referenceKeywordInput}
-                      onChange={(event) => setReferenceKeywordInput(event.target.value)}
-                      onKeyDown={handleReferenceKeywordKeyDown}
-                      placeholder="z. B. fogged glass, pressure flare, lacquer grain"
-                      className="flex-1 rounded-lg border border-[rgba(114,228,255,0.12)] bg-[#040d1a] px-3 py-2 font-mono text-[11px] text-[#c8ddf0] placeholder-[#27405e] outline-none transition focus:border-[rgba(114,228,255,0.3)]"
-                    />
-                    <button
-                      type="button"
-                      onClick={flushReferenceKeywordInput}
-                      disabled={!referenceKeywordInput.trim()}
-                      className="rounded-lg border border-[rgba(114,228,255,0.18)] bg-[rgba(14,30,56,0.7)] px-3 py-2 font-mono text-[11px] font-semibold text-[#72e4ff] transition hover:bg-[rgba(20,44,76,0.8)] disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      Chip hinzufuegen
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {stylePresets.length > 0 && (
-              <div className="space-y-3">
-                <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-[#4a7090]">
-                  Style Presets
-                </div>
-                <div className="grid gap-4 lg:grid-cols-3">
-                  {stylePresets.map((preset, index) => (
-                    <article
-                      key={preset.id}
-                      className="rounded-[18px] border border-[rgba(114,228,255,0.12)] bg-[rgba(8,16,30,0.82)] p-4 space-y-3"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <span className={`rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.16em] ${index === 0 ? 'border-[rgba(114,228,255,0.24)] bg-[rgba(18,42,64,0.45)] text-[#72e4ff]' : 'border-[rgba(232,169,74,0.18)] bg-[rgba(48,33,11,0.42)] text-[#e8c16a]'}`}>
-                          {index === 0 ? 'Base' : `Accent ${index}`}
-                        </span>
-                        <span className="font-mono text-[10px] text-[#36516e]">{preset.id}</span>
-                      </div>
-
-                      <div>
-                        <h3 className="font-mono text-sm font-semibold text-[#f3f8ff]">
-                          {preset.name}
-                        </h3>
-                        <p className="mt-1 text-xs leading-relaxed text-[#8ea6c3]">
-                          {preset.visualIdentity}
-                        </p>
-                      </div>
-
-                      <div className="space-y-2 font-mono text-[10px] leading-relaxed text-[#4a7090]">
-                        <div>
-                          Palette: <span className="text-[#c8ddf0]">{preset.colorPalette}</span>
-                        </div>
-                        <div>
-                          Lighting: <span className="text-[#c8ddf0]">{preset.lighting}</span>
-                        </div>
-                        <div>
-                          Motion: <span className="text-[#c8ddf0]">{preset.motionStyle}</span>
-                        </div>
-                        <div>
-                          Prompt DNA: <span className="text-[#8ea6c3]">{preset.shortPrompt}</span>
-                        </div>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              </div>
-            )}
-          </section>
-        )}
+        {/* Right column · Generated output + storyboard */}
+        <div className="space-y-6">
 
         {/* ── Scene beat cards ──────────────────────────────────────────────── */}
         {scenes.length > 0 && (
@@ -2399,13 +2500,15 @@ export default function StillframeHarness({ onNavigateBack }: StillframeHarnessP
               </span>
             </div>
 
-            <div className="grid gap-5 xl:grid-cols-4 lg:grid-cols-2">
+            <div className="grid gap-5 lg:grid-cols-2">
               {scenes.map((scene, index) => (
                 <SceneCard
                   key={`${scene.beat}-${index}`}
                   scene={scene}
                   index={index}
                   onPromptChange={handlePromptChange}
+                  onTransformPromptChange={handleVideoTransformPromptChange}
+                  onDurationChange={handleDurationChange}
                   onPolish={handlePolishPrompt}
                   onSketch={handleSketch}
                   onVideo={handleVideo}
@@ -2431,6 +2534,47 @@ export default function StillframeHarness({ onNavigateBack }: StillframeHarnessP
             </p>
           </div>
         )}
+        {/* End right column */}
+        </div>
+        {/* End two-column studio grid */}
+        </div>
+
+        <section
+          ref={storyComposerSectionRef}
+          className="scroll-mt-24 rounded-[24px] border border-[rgba(232,169,74,0.16)] bg-[rgba(8,10,18,0.86)] p-5 backdrop-blur-sm"
+        >
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#8a6a30]">Scene composing</div>
+              <h2 className="mt-1 font-mono text-lg font-semibold text-[#f3f8ff]">Story Scenes GIF Composer</h2>
+              <p className="mt-1 max-w-3xl text-xs leading-relaxed text-[#8ea6c3]">
+                Verarbeite freie Ideen oder ARV-Seeds zu editierbaren Szenen, generiere einzelne GIFs oder exportiere komplette Fiction-Runs als ZIP.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {preloadedStoryboard && (
+                <span className="rounded-full border border-[rgba(114,228,255,0.18)] bg-[rgba(10,26,46,0.68)] px-3 py-1.5 font-mono text-[10px] font-semibold text-[#72e4ff]">
+                  ARV Seed aktiv · {preloadedStoryboard.scenes.length} Szenen
+                </span>
+              )}
+              <span className="rounded-full border border-[rgba(232,169,74,0.18)] bg-[rgba(42,28,6,0.64)] px-3 py-1.5 font-mono text-[10px] font-semibold text-[#e8c16a]">
+                {model === 'foundry' ? 'Azure Foundry' : 'OpenAI'} Renderer
+              </span>
+            </div>
+          </div>
+
+          <div className="rounded-[20px] border border-[rgba(114,228,255,0.08)] bg-stone-50 p-4 text-stone-900 dark:bg-zinc-950 dark:text-stone-100">
+            <StoryMode
+              embedded
+              model={model}
+              setModel={setModel}
+              onStorySaved={onStorySaved}
+              saveToLibrary={saveToLibrary}
+              preloadedStoryboard={preloadedStoryboard}
+              onAzureUsage={onAzureUsage}
+            />
+          </div>
+        </section>
       </main>
     </div>
   );
@@ -2443,6 +2587,8 @@ interface SceneCardProps {
   index: number;
   runId: string;
   onPromptChange: (index: number, value: string) => void;
+  onTransformPromptChange: (index: number, value: string) => void;
+  onDurationChange: (index: number, value: number) => void;
   onPolish: (index: number) => void;
   onSketch: (index: number) => void;
   onVideo: (index: number) => void;
@@ -2450,7 +2596,7 @@ interface SceneCardProps {
   onVideoExtension: (index: number) => void;
 }
 
-function SceneCard({ scene, index, runId, onPromptChange, onPolish, onSketch, onVideo, onVideoRemix, onVideoExtension }: SceneCardProps) {
+function SceneCard({ scene, index, runId, onPromptChange, onTransformPromptChange, onDurationChange, onPolish, onSketch, onVideo, onVideoRemix, onVideoExtension }: SceneCardProps) {
   const beatLabel = BEAT_LABELS[scene.beat] ?? `Beat ${index + 1}`;
   const beatColorClass = BEAT_COLORS[scene.beat] ?? 'bg-zinc-800/60 text-zinc-300 border-zinc-700/50';
   const cardRingClass = BEAT_RING[scene.beat] ?? 'border-zinc-700/40';
@@ -2476,6 +2622,32 @@ function SceneCard({ scene, index, runId, onPromptChange, onPolish, onSketch, on
         </p>
       </div>
 
+      <div className="px-4 pt-3">
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-[rgba(232,169,74,0.12)] bg-[rgba(22,16,6,0.48)] px-3 py-2 font-mono text-[10px] text-[#b9a06d]">
+          <span className="uppercase tracking-[0.16em] text-[#8a6a30]">Video</span>
+          <div className="inline-flex rounded-md border border-[rgba(232,169,74,0.16)] bg-[#040d1a] p-0.5" role="group" aria-label={`Videolaenge fuer Szene ${index + 1}`}>
+            {SUPPORTED_VIDEO_DURATION_SECONDS.map((duration) => {
+              const isActive = scene.durationSeconds === duration;
+              return (
+                <button
+                  key={duration}
+                  type="button"
+                  onClick={() => onDurationChange(index, duration)}
+                  className={`h-7 min-w-9 rounded px-2 text-[11px] font-semibold transition ${isActive
+                    ? 'bg-[rgba(232,169,74,0.24)] text-[#f6d58f] shadow-[0_0_16px_rgba(232,169,74,0.18)]'
+                    : 'text-[#8a6a30] hover:bg-[rgba(232,169,74,0.1)] hover:text-[#d0ae6a]'
+                  }`}
+                  aria-pressed={isActive}
+                >
+                  {duration}s
+                </button>
+              );
+            })}
+          </div>
+          <span>720p · Sora: 4/8/12s · Standard {DEFAULT_VIDEO_DURATION_SECONDS}s</span>
+        </div>
+      </div>
+
       {/* Prompt textarea */}
       <div className="px-4 py-2 flex-1">
         <textarea
@@ -2486,6 +2658,26 @@ function SceneCard({ scene, index, runId, onPromptChange, onPolish, onSketch, on
           placeholder="Generation prompt…"
         />
       </div>
+
+      {scene.videoId && (
+        <div className="px-4 pb-3">
+          <label className="block rounded-lg border border-[rgba(168,118,255,0.12)] bg-[rgba(18,12,34,0.54)] px-3 py-2">
+            <span className="mb-1 block font-mono text-[10px] uppercase tracking-[0.16em] text-[#8f74c9]">
+              Remix / Extend Änderungswunsch
+            </span>
+            <textarea
+              value={scene.videoTransformPrompt}
+              onChange={(event) => onTransformPromptChange(index, event.target.value)}
+              rows={2}
+              className="w-full resize-none bg-transparent font-mono text-[11px] leading-relaxed text-[#d8c2ff] placeholder-[#705d92] outline-none"
+              placeholder="z. B. cyan edge split staerker, langsamere Rueckkehr, zentralen Ring enger schließen"
+            />
+          </label>
+          <div className="mt-1 font-mono text-[10px] text-[#705d92]">
+            Remix/Extend sendet diesen Prompt zusammen mit Video-ID {scene.videoId}.
+          </div>
+        </div>
+      )}
 
       {/* Action row */}
       <div className="grid grid-cols-5 gap-2 px-4 pb-4 pt-1">
@@ -2749,12 +2941,14 @@ function IdeaListPanel({
   allowUse,
   onUseRitual,
   onUseSatire,
+  onUseSignal,
 }: {
   label: string;
   items: string[];
-  allowUse?: 'ritual' | 'satire' | 'both';
+  allowUse?: 'ritual' | 'satire' | 'signal' | 'both' | 'all';
   onUseRitual: (value: string) => void;
   onUseSatire: (value: string) => void;
+  onUseSignal: (value: string) => void;
 }) {
   return (
     <article className="rounded-[18px] border border-[rgba(168,118,255,0.14)] bg-[rgba(8,12,24,0.76)] p-4 space-y-3">
@@ -2771,7 +2965,7 @@ function IdeaListPanel({
               <div className="font-mono text-[11px] leading-relaxed text-[#efe5ff]">{item}</div>
               <div className="flex flex-wrap gap-2">
                 <CopyTextButton text={item} compact />
-                {(allowUse === 'ritual' || allowUse === 'both') && (
+                {(allowUse === 'ritual' || allowUse === 'both' || allowUse === 'all') && (
                   <button
                     type="button"
                     onClick={() => onUseRitual(item)}
@@ -2780,13 +2974,22 @@ function IdeaListPanel({
                     Ritual Input
                   </button>
                 )}
-                {(allowUse === 'satire' || allowUse === 'both') && (
+                {(allowUse === 'satire' || allowUse === 'both' || allowUse === 'all') && (
                   <button
                     type="button"
                     onClick={() => onUseSatire(item)}
                     className="rounded-lg border border-[rgba(232,169,74,0.18)] bg-[rgba(42,28,6,0.7)] px-2 py-1 font-mono text-[10px] font-semibold text-[#e8c16a] transition hover:bg-[rgba(58,38,8,0.8)]"
                   >
                     Satire Fokus
+                  </button>
+                )}
+                {(allowUse === 'signal' || allowUse === 'all') && (
+                  <button
+                    type="button"
+                    onClick={() => onUseSignal(item)}
+                    className="rounded-lg border border-[rgba(0,245,212,0.18)] bg-[rgba(4,28,30,0.72)] px-2 py-1 font-mono text-[10px] font-semibold text-[#6ff7e2] transition hover:bg-[rgba(8,42,44,0.82)]"
+                  >
+                    Signal Input
                   </button>
                 )}
               </div>
@@ -2802,15 +3005,19 @@ function IdeaVisionCard({
   vision,
   onUseRitual,
   onUseSatire,
+  onUseSignal,
   onGenerateRitual,
   onGenerateSatire,
+  onGenerateSignal,
   isGenerating,
 }: {
   vision: StillframeIdeaVision;
   onUseRitual: (value: string) => void;
   onUseSatire: (value: string) => void;
+  onUseSignal: (value: string) => void;
   onGenerateRitual: (vision: StillframeIdeaVision) => Promise<void>;
   onGenerateSatire: (vision: StillframeIdeaVision) => Promise<void>;
+  onGenerateSignal: (vision: StillframeIdeaVision) => Promise<void>;
   isGenerating: boolean;
 }) {
   const visionClipboardText = [
@@ -2849,6 +3056,14 @@ function IdeaVisionCard({
           >
             {isGenerating ? 'Laeuft...' : '4 Satire Beats'}
           </button>
+          <button
+            type="button"
+            onClick={() => void onGenerateSignal(vision)}
+            disabled={isGenerating}
+            className="rounded-lg border border-[rgba(0,245,212,0.18)] bg-[rgba(4,28,30,0.72)] px-2 py-1 font-mono text-[10px] font-semibold text-[#6ff7e2] transition hover:bg-[rgba(8,42,44,0.82)] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {isGenerating ? 'Laeuft...' : '4 Signal Beats'}
+          </button>
           <CopyTextButton text={visionClipboardText} label="Card kopieren" copiedLabel="Card kopiert" compact />
         </div>
       </div>
@@ -2882,6 +3097,13 @@ function IdeaVisionCard({
               >
                 Satire Fokus
               </button>
+              <button
+                type="button"
+                onClick={() => onUseSignal(vision.story)}
+                className="rounded-lg border border-[rgba(0,245,212,0.18)] bg-[rgba(4,28,30,0.72)] px-2 py-1 font-mono text-[10px] font-semibold text-[#6ff7e2] transition hover:bg-[rgba(8,42,44,0.82)]"
+              >
+                Signal Input
+              </button>
             </div>
           </div>
 
@@ -2903,6 +3125,13 @@ function IdeaVisionCard({
                 className="rounded-lg border border-[rgba(232,169,74,0.18)] bg-[rgba(42,28,6,0.7)] px-2 py-1 font-mono text-[10px] font-semibold text-[#e8c16a] transition hover:bg-[rgba(58,38,8,0.8)]"
               >
                 Satire Fokus
+              </button>
+              <button
+                type="button"
+                onClick={() => onUseSignal(vision.promptSeed)}
+                className="rounded-lg border border-[rgba(0,245,212,0.18)] bg-[rgba(4,28,30,0.72)] px-2 py-1 font-mono text-[10px] font-semibold text-[#6ff7e2] transition hover:bg-[rgba(8,42,44,0.82)]"
+              >
+                Signal Input
               </button>
             </div>
           </div>

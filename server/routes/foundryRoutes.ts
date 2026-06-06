@@ -27,6 +27,21 @@ import { mergeIQSceneContext, normalizeIQBriefForDebug, resolveIQBrief } from '.
 
 const FOUNDRY_VIDEO_POLL_INTERVAL_MS = 4000;
 const FOUNDRY_VIDEO_MAX_WAIT_MS = 10 * 60 * 1000;
+const SORA_SUPPORTED_VIDEO_SECONDS = [4, 8, 12] as const;
+const SORA_DEFAULT_VIDEO_SECONDS = 4;
+
+const normalizeSoraVideoSeconds = (value: unknown): number => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return SORA_DEFAULT_VIDEO_SECONDS;
+  }
+
+  return SORA_SUPPORTED_VIDEO_SECONDS.reduce((closest, seconds) => {
+    const closestDistance = Math.abs(closest - parsed);
+    const secondsDistance = Math.abs(seconds - parsed);
+    return secondsDistance < closestDistance ? seconds : closest;
+  }, SORA_DEFAULT_VIDEO_SECONDS);
+};
 
 export const createFoundryRoutes = () => {
   const router = Router();
@@ -379,7 +394,11 @@ export const createFoundryRoutes = () => {
         prompt: userPrompt,
         model: asNonEmptyString(model) || undefined,
         size: asNonEmptyString(size) || undefined,
-        quality: (quality === 'hd' ? 'hd' : 'standard') as 'standard' | 'hd',
+        quality: quality === 'low' || quality === 'medium' || quality === 'high' || quality === 'auto'
+          ? quality
+          : quality === 'hd'
+            ? 'high'
+            : 'auto',
       });
 
       return res.json({ success: true, ...result });
@@ -438,7 +457,7 @@ export const createFoundryRoutes = () => {
         iqBrief: normalizeIQBriefForDebug(iqBrief),
       };
       const requestedSize = asNonEmptyString(size) || '1280x720';
-      const requestedSeconds = Number.isFinite(Number(seconds)) ? Number(seconds) : 4;
+      const requestedSeconds = normalizeSoraVideoSeconds(seconds);
 
       let job = videoTransform === 'extend'
         ? await foundryVideoExtend({
@@ -477,10 +496,12 @@ export const createFoundryRoutes = () => {
         }
 
         if (VIDEO_SUCCESS_STATUSES.has(status)) {
+          const resolvedVideoId = job.videoId || job.id;
+
           if (job.videoUrl) {
             return res.json({
               success: true,
-              videoId: job.id,
+              videoId: resolvedVideoId,
               jobId: job.id,
               status,
               videoUrl: job.videoUrl,
@@ -489,7 +510,7 @@ export const createFoundryRoutes = () => {
               size: requestedSize,
               debug: {
                 ...debug,
-                resultVideoId: job.id,
+                resultVideoId: resolvedVideoId,
               },
             });
           }
@@ -498,7 +519,7 @@ export const createFoundryRoutes = () => {
             const videoBase64 = await foundryVideoDownload(job.id, selectedDeployment);
             return res.json({
               success: true,
-              videoId: job.id,
+              videoId: resolvedVideoId,
               jobId: job.id,
               status,
               videoBase64,
@@ -507,7 +528,7 @@ export const createFoundryRoutes = () => {
               size: requestedSize,
               debug: {
                 ...debug,
-                resultVideoId: job.id,
+                resultVideoId: resolvedVideoId,
               },
             });
           } catch {

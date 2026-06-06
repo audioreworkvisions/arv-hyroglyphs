@@ -29,14 +29,29 @@ const OPENAI_VIDEO_TERMINAL_STATUSES = new Set([
   ...VIDEO_SUCCESS_STATUSES,
   ...VIDEO_FAILURE_STATUSES,
 ]);
+const SORA_SUPPORTED_VIDEO_SECONDS = [4, 8, 12] as const;
+const SORA_DEFAULT_VIDEO_SECONDS = 4;
 
 const getOpenAITextModel = (): string => process.env.OPENAI_TEXT_MODEL || 'gpt-4.1-mini';
 const getOpenAIStoryboardModel = (): string => process.env.OPENAI_STORYBOARD_MODEL || getOpenAITextModel();
-const getOpenAIImageModel = (): string => process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1';
+const getOpenAIImageModel = (): string => process.env.OPENAI_IMAGE_MODEL || 'gpt-image-2';
 const getOpenAIVideoModel = (): string => process.env.OPENAI_VIDEO_MODEL || 'sora-2';
 const getAzureCompletionsEndpoint = (): string => process.env.AZURE_EXISTING_AIPROJECT_ENDPOINT || '';
 const getAzureCompletionsKey = (): string => process.env.AZURE_AI_FOUNDRY_KEY || process.env.AZURE_OPENAI_COMPLETIONS_KEY || '';
 const getAzureStoryboardModel = (): string => process.env.AZURE_OPENAI_STORYBOARD_MODEL || getOpenAIStoryboardModel();
+
+const normalizeSoraVideoSeconds = (value: unknown): number => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return SORA_DEFAULT_VIDEO_SECONDS;
+  }
+
+  return SORA_SUPPORTED_VIDEO_SECONDS.reduce((closest, seconds) => {
+    const closestDistance = Math.abs(closest - parsed);
+    const secondsDistance = Math.abs(seconds - parsed);
+    return secondsDistance < closestDistance ? seconds : closest;
+  }, SORA_DEFAULT_VIDEO_SECONDS);
+};
 
 const prefersDefaultTemperature = (modelName: string): boolean =>
   /(^|[^a-z])gpt-5([.-]|$)|(^|[^a-z])gpt-5\.2([.-]|$)|(^|[^a-z])gpt-5\.2-chat([.-]|$)/i.test(modelName);
@@ -262,10 +277,7 @@ export const createOpenAIRoutes = () => {
       const selectedModel = asNonEmptyString(model) || getOpenAIVideoModel();
       const selectedSize = asNonEmptyString(size);
       const normalizedSize = normalizeOpenAIVideoSize(selectedModel, selectedSize);
-      const selectedSeconds = Number.isFinite(Number(seconds)) ? Number(seconds) : null;
-      const normalizedSeconds = selectedSeconds && selectedSeconds > 0
-        ? Math.max(1, Math.round(selectedSeconds))
-        : null;
+      const normalizedSeconds = normalizeSoraVideoSeconds(seconds);
       const preset = asNonEmptyString(presetId)
         ? (PRESETS.find((entry) => entry.id === presetId) ?? null)
         : null;

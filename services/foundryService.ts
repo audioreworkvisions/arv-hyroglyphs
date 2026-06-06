@@ -10,7 +10,7 @@
  *   AZURE_AI_FOUNDRY_KEY            – API-Schlüssel (AI Foundry Portal)
  *   AZURE_AI_FOUNDRY_MODEL          – (optional) Standard-Textmodell, z.B. "Phi-4"
  *   AZURE_AI_FOUNDRY_API_VERSION    – (optional) API-Version für den Inference-Client, falls der Endpoint den SDK-Default nicht unterstützt
- *   AZURE_AI_FOUNDRY_IMAGE_MODEL    – (optional) Standard-Bildmodell, z.B. "dall-e-3"
+ *   AZURE_AI_FOUNDRY_IMAGE_MODEL    – (optional) Standard-Bildmodell, z.B. "gpt-image-2"
  *
  *   AZURE_OPENAI_ENDPOINT           – z.B. https://<resource>.openai.azure.com
  *   AZURE_OPENAI_KEY                – API-Schlüssel (Azure OpenAI Resource)
@@ -328,7 +328,7 @@ export interface FoundryImageOptions {
   prompt: string;
   model?: string;
   size?: string;
-  quality?: "standard" | "hd";
+  quality?: "low" | "medium" | "high" | "auto" | "standard" | "hd";
   n?: number;
 }
 
@@ -356,55 +356,92 @@ export async function foundryImageGenerate(
   ).trim().replace(/\/$/, '');
 
   const legacyEndpoint = (process.env.AZURE_OPENAI_ENDPOINT || '').trim();
-  const deployment =
-    options.model ||
-    process.env.AZURE_OPENAI_IMAGE_DEPLOYMENT ||
-    'dall-e-3';
+  const sanitizeImageDeployment = (value?: string): string | undefined => {
+    const trimmed = value?.trim();
+    if (!trimmed || trimmed.toLowerCase() === 'gpt-image-1') {
+      return undefined;
+    }
+    return trimmed;
+  };
+
+  const preferredDeployment =
+    sanitizeImageDeployment(options.model) ||
+    sanitizeImageDeployment(process.env.AZURE_OPENAI_IMAGE_DEPLOYMENT) ||
+    sanitizeImageDeployment(process.env.AZURE_AI_FOUNDRY_IMAGE_MODEL) ||
+    'gpt-image-2';
+  const deploymentCandidates = Array.from(new Set([
+    preferredDeployment,
+    sanitizeImageDeployment(process.env.AZURE_OPENAI_IMAGE_FALLBACK_DEPLOYMENT),
+    sanitizeImageDeployment(process.env.AZURE_AI_FOUNDRY_IMAGE_MODEL),
+    'gpt-image-2',
+  ].filter((value): value is string => Boolean(value))));
   const apiVersion =
     process.env.AZURE_OPENAI_API_VERSION || '2025-04-01-preview';
+  const normalizeImageQuality = (value?: FoundryImageOptions['quality']): 'low' | 'medium' | 'high' | 'auto' => {
+    if (value === 'low' || value === 'medium' || value === 'high' || value === 'auto') {
+      return value;
+    }
+    if (value === 'hd') {
+      return 'high';
+    }
+    return 'auto';
+  };
+  const imageQuality = normalizeImageQuality(options.quality);
 
   // Detect AI Foundry format: base URL already contains /openai/v1
   const useFoundryFormat =
     aiProjectEndpoint.includes('/openai/v1') && !!aiProjectEndpoint;
 
-  let url: string;
-  let requestBody: Record<string, unknown>;
+  let data: any = null;
+  let usedDeployment = preferredDeployment;
+  let lastError: string | null = null;
 
-  if (useFoundryFormat) {
-    // New format: model in body, no deployment in URL
-    url = `${aiProjectEndpoint}/images/generations`;
-    requestBody = {
-      model: deployment,
-      prompt: options.prompt,
-      n: options.n ?? 1,
-      size: options.size ?? '1024x1024',
-      quality: options.quality ?? 'standard',
-      response_format: 'b64_json',
-    };
-  } else {
-    // Legacy format: deployment in URL path
-    if (!legacyEndpoint) throw new Error("AZURE_OPENAI_ENDPOINT fehlt. Bitte in .env.local eintragen.");
-    url = `${legacyEndpoint.replace(/\/$/, '')}/openai/deployments/${deployment}/images/generations?api-version=${apiVersion}`;
-    requestBody = {
-      prompt: options.prompt,
-      n: options.n ?? 1,
-      size: options.size ?? '1024x1024',
-      quality: options.quality ?? 'standard',
-      response_format: 'b64_json',
-    };
+  for (const deployment of deploymentCandidates) {
+    let url: string;
+    let requestBody: Record<string, unknown>;
+
+    if (useFoundryFormat) {
+      url = `${aiProjectEndpoint}/images/generations`;
+      requestBody = {
+        model: deployment,
+        prompt: options.prompt,
+        n: options.n ?? 1,
+        size: options.size ?? '1024x1024',
+        quality: imageQuality,
+      };
+    } else {
+      if (!legacyEndpoint) throw new Error("AZURE_OPENAI_ENDPOINT fehlt. Bitte in .env.local eintragen.");
+      url = `${legacyEndpoint.replace(/\/$/, '')}/openai/deployments/${deployment}/images/generations?api-version=${apiVersion}`;
+      requestBody = {
+        prompt: options.prompt,
+        n: options.n ?? 1,
+        size: options.size ?? '1024x1024',
+        quality: imageQuality,
+      };
+    }
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'api-key': apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
+    });
+
+    data = await res.json() as any;
+
+    if (res.ok) {
+      usedDeployment = deployment;
+      lastError = null;
+      break;
+    }
+
+    lastError = data?.error?.message || data?.message || `Azure OpenAI Image-Fehler: HTTP ${res.status}`;
+    if (!/unknown model|model.*not found|deployment.*not found|invalid.*model/i.test(lastError)) {
+      throw new Error(lastError);
+    }
   }
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'api-key': apiKey, 'Content-Type': 'application/json' },
-    body: JSON.stringify(requestBody),
-  });
-
-  const data = await res.json() as any;
-
-  if (!res.ok) {
-    const msg = data?.error?.message || data?.message || `Azure OpenAI Image-Fehler: HTTP ${res.status}`;
-    throw new Error(msg);
+  if (lastError) {
+    throw new Error(lastError);
   }
 
   const item = data?.data?.[0];
@@ -425,7 +462,7 @@ export async function foundryImageGenerate(
 
   return {
     imageData,
-    model: deployment,
+    model: usedDeployment,
     revisedPrompt: item.revised_prompt ?? undefined,
   };
 }
@@ -453,6 +490,7 @@ export interface FoundryVideoExtendOptions {
 export interface FoundryVideoJob {
   id: string;
   status: string;
+  videoId?: string;
   videoUrl?: string;
   videoBase64?: string;
   error?: string;
@@ -474,18 +512,46 @@ const azureVideoHeaders = (apiKey: string): HeadersInit => ({
   "Content-Type": "application/json",
 });
 
+const SORA_SUPPORTED_VIDEO_SECONDS = [4, 8, 12] as const;
+const SORA_DEFAULT_VIDEO_SECONDS = 4;
+
 const normalizeAzureVideoSeconds = (seconds?: number): string | undefined => {
-  if (!(seconds && seconds > 0)) {
-    return undefined;
+  if (!Number.isFinite(Number(seconds))) {
+    return String(SORA_DEFAULT_VIDEO_SECONDS);
   }
 
-  const rounded = Math.round(seconds);
-  const allowed = [4, 8, 12];
-  const nearest = allowed.reduce((current, candidate) => (
-    Math.abs(candidate - rounded) < Math.abs(current - rounded) ? candidate : current
-  ));
+  const parsed = Number(seconds);
+  const normalizedSeconds = SORA_SUPPORTED_VIDEO_SECONDS.reduce((closest, duration) => {
+    const closestDistance = Math.abs(closest - parsed);
+    const durationDistance = Math.abs(duration - parsed);
+    return durationDistance < closestDistance ? duration : closest;
+  }, SORA_DEFAULT_VIDEO_SECONDS);
 
-  return String(nearest);
+  return String(normalizedSeconds);
+};
+
+const pickFoundryVideoResourceId = (payload: any): string | undefined => {
+  const candidates = [
+    payload?.video?.id,
+    payload?.result?.video?.id,
+    payload?.result?.id,
+    payload?.output?.video?.id,
+    payload?.output?.id,
+    payload?.output?.[0]?.id,
+    payload?.data?.[0]?.id,
+    payload?.id,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === "string") {
+      const trimmed = candidate.trim();
+      if (trimmed) {
+        return trimmed;
+      }
+    }
+  }
+
+  return undefined;
 };
 
 export async function foundryVideoCreate(
@@ -523,6 +589,7 @@ export async function foundryVideoCreate(
   return {
     id: data.id ?? "",
     status: (data.status ?? "").toLowerCase(),
+    videoId: pickFoundryVideoResourceId(data),
     videoUrl: data.result?.url ?? data.url ?? undefined,
     error: data.error?.message ?? undefined,
   };
@@ -538,28 +605,35 @@ export async function foundryVideoEdit(
     throw new Error("videoId ist fuer Video-Edits erforderlich.");
   }
 
-  const res = await fetch(`${endpoint}/edits`, {
+  // Azure Sora 2 kennt kein /edits. Video-zu-Video-Anpassungen laufen ueber
+  // den pfadbasierten Remix-Endpoint: POST /videos/{videoId}/remix mit { prompt }.
+  const remixUrl = `${endpoint}/${videoId}/remix`;
+  const res = await fetch(remixUrl, {
     method: "POST",
     headers: azureVideoHeaders(apiKey),
-    body: JSON.stringify({
-      video: { id: videoId },
-      prompt: options.prompt,
-    }),
+    body: JSON.stringify({ prompt: options.prompt }),
   });
 
-  const data = await res.json() as any;
+  const rawText = await res.text();
+  let data: any = {};
+  try {
+    data = rawText ? JSON.parse(rawText) : {};
+  } catch {
+    data = { message: rawText };
+  }
 
   if (!res.ok) {
     const msg =
       data?.error?.message ||
       data?.message ||
-      `Azure Video-Edit-Fehler: HTTP ${res.status}`;
+      `Azure Video-Remix-Fehler: HTTP ${res.status}`;
     throw new Error(msg);
   }
 
   return {
     id: data.id ?? "",
     status: (data.status ?? "").toLowerCase(),
+    videoId: pickFoundryVideoResourceId(data),
     videoUrl: data.result?.url ?? data.url ?? undefined,
     error: data.error?.message ?? undefined,
   };
@@ -575,35 +649,36 @@ export async function foundryVideoExtend(
     throw new Error("videoId ist fuer Video-Extensions erforderlich.");
   }
 
-  const normalizedSeconds = normalizeAzureVideoSeconds(options.seconds);
-  const body: Record<string, unknown> = {
-    video: { id: videoId },
-    prompt: options.prompt,
-  };
-
-  if (normalizedSeconds) {
-    body.seconds = normalizedSeconds;
-  }
-
-  const res = await fetch(`${endpoint}/extensions`, {
+  // Azure Sora 2 bietet keinen echten Extend-Endpoint (/extensions existiert nicht).
+  // Das einzige unterstuetzte video->video-Verfahren ist Remix:
+  // POST /videos/{videoId}/remix mit { prompt }.
+  const remixUrl = `${endpoint}/${videoId}/remix`;
+  const res = await fetch(remixUrl, {
     method: "POST",
     headers: azureVideoHeaders(apiKey),
-    body: JSON.stringify(body),
+    body: JSON.stringify({ prompt: options.prompt }),
   });
 
-  const data = await res.json() as any;
+  const rawText = await res.text();
+  let data: any = {};
+  try {
+    data = rawText ? JSON.parse(rawText) : {};
+  } catch {
+    data = { message: rawText };
+  }
 
   if (!res.ok) {
     const msg =
       data?.error?.message ||
       data?.message ||
-      `Azure Video-Extension-Fehler: HTTP ${res.status}`;
+      `Azure Video-Remix-Fehler: HTTP ${res.status}`;
     throw new Error(msg);
   }
 
   return {
     id: data.id ?? "",
     status: (data.status ?? "").toLowerCase(),
+    videoId: pickFoundryVideoResourceId(data),
     videoUrl: data.result?.url ?? data.url ?? undefined,
     error: data.error?.message ?? undefined,
   };
@@ -634,6 +709,7 @@ export async function foundryVideoRetrieve(
   return {
     id: data.id ?? jobId,
     status: (data.status ?? "").toLowerCase(),
+    videoId: pickFoundryVideoResourceId(data),
     videoUrl: data.result?.url ?? data.url ?? undefined,
     error: data.error?.message ?? undefined,
   };

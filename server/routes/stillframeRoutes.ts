@@ -11,6 +11,7 @@ import { Router } from 'express';
 import OpenAI from 'openai';
 import { ARV_CHARACTERS, getCharacter } from '../../lib/arvCharacters';
 import type { ARVSatireSketch } from '../../lib/arvTypes';
+import { arvMinimalSignalGeometryPreset } from '../../lib/minimalSignalGeometryPreset';
 import { PRESETS } from '../../lib/presets';
 import {
   DEFAULT_STILLFRAME_SATIRE_PRESET_PROFILE_ID,
@@ -41,6 +42,7 @@ import { VIDEO_FAILURE_STATUSES, VIDEO_SUCCESS_STATUSES, sleep } from '../utils/
 const STILLFRAME_PRESET: StylePreset | null = null;
 const STILLFRAME_STYLE_TASTE_PRESET: StylePreset | null = null;
 const STILLFRAME_COMPATIBLE_PRESET_ID_SET = new Set<string>([
+  arvMinimalSignalGeometryPreset.id,
   'micro-city-on-vinyl',
   'bass-weather-laboratory',
   'cable-monastery',
@@ -70,6 +72,21 @@ const STILLFRAME_MAX_REFERENCE_IMAGES = 4;
 
 const VIDEO_POLL_INTERVAL_MS = 4000;
 const VIDEO_MAX_WAIT_MS = 10 * 60 * 1000;
+const SORA_SUPPORTED_VIDEO_SECONDS = [4, 8, 12] as const;
+const SORA_DEFAULT_VIDEO_SECONDS = 4;
+
+const normalizeSoraVideoSeconds = (value: unknown): number => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return SORA_DEFAULT_VIDEO_SECONDS;
+  }
+
+  return SORA_SUPPORTED_VIDEO_SECONDS.reduce((closest, seconds) => {
+    const closestDistance = Math.abs(closest - parsed);
+    const secondsDistance = Math.abs(seconds - parsed);
+    return secondsDistance < closestDistance ? seconds : closest;
+  }, SORA_DEFAULT_VIDEO_SECONDS);
+};
 
 // ── Azure Completions client ────────────────────────────────────────────────
 
@@ -205,7 +222,7 @@ const normalizeStillframeIdeaVision = (value: unknown, index: number): Stillfram
 };
 
 const buildStillframeIdeaClipboardText = (input: {
-  mode: 'ritual' | 'satire';
+  mode: 'ritual' | 'satire' | 'signal';
   seed: string | null;
   themes: string[];
   characters: string[];
@@ -958,10 +975,10 @@ Each scene "prompt" sent to Sora must be:
 - Diversity must stay inside the ARV family resemblance, but the four scenes should be free to invent different material and world behaviors instead of reusing one old canon.
 
 ═══ CONTINUITY MODEL ═══
-The four scenes form ONE physical arc across ~16 seconds, cut into 4×4s clips.
+The four scenes form ONE physical arc. Each clip may be rendered at a Sora-supported 4, 8, or 12 second duration, so write timing that can stretch or compress cleanly without breaking the physical handoff.
 - Scene 1 (freeze): Subject starts nearly settled, but never dead. Low idle motion, drift, pulse, sway, flicker, recoil, or breathing is already present from the first second. The main event should become clearly legible before the clip ends.
 - Scene 2 (onset): Starts at scene 1's exact end-frame physical state. Motion now travels, unfolds, expands, contracts, rotates, spills, or deforms with clear direction and stronger amplitude.
-- Scene 3 (hold): Starts at scene 2's exact 4s end-frame. This is the peak state, but it must stay kinetically alive: sustained pulse, vibration, orbit, pressure-wave, oscillation, shedding light, or internal churn. Never turn hold into a static pause.
+- Scene 3 (hold): Starts at scene 2's exact final frame. This is the peak state, but it must stay kinetically alive: sustained pulse, vibration, orbit, pressure-wave, oscillation, shedding light, or internal churn. Never turn hold into a static pause.
 - Scene 4 (return): Starts at scene 3's active peak. Reversal or re-coherence begins, but with visible residue: elastic overshoot, aftershocks, echo trails, settling sway, or repeated micro-surges. The end should loop cleanly back toward scene 1.
 
 HANDOFF RULE: Each prompt must open with the inherited physical state from the previous scene's final frame. No hard discontinuity, but elastic residue and soft loop-closure are allowed.
@@ -1008,6 +1025,68 @@ Return ONLY valid JSON. No markdown, no commentary.
   ]
 }`;
 
+const buildMinimalSignalGeometrySystemPrompt = (
+  stylePresets: StylePreset[],
+  referenceStyle?: StillframeReferenceStyleSummary | null,
+): string => `You are the "ARV Minimal Signal Geometry" prompt engine. Generate four connected Stillframe scenes for abstract CRT signal geometry loops.
+
+═══ PRESET LOCK — ${arvMinimalSignalGeometryPreset.name} ═══
+${arvMinimalSignalGeometryPreset.promptCore}
+
+Style rules:
+- Background: ${arvMinimalSignalGeometryPreset.visualIdentity.background}.
+- Composition: ${arvMinimalSignalGeometryPreset.visualIdentity.composition}.
+- Subject type: ${arvMinimalSignalGeometryPreset.visualIdentity.subjectType}.
+- Palette: black and near-black base, electric cyan, hot magenta, warm ivory, ember orange, dirty white; optional acid lime, blue violet, or red signal only as tiny accents.
+- Textures: ${arvMinimalSignalGeometryPreset.texture.join(', ')}.
+- Motifs: ${arvMinimalSignalGeometryPreset.motifs.join(', ')}.
+- Motion grammar: ${arvMinimalSignalGeometryPreset.motionRules.rhythm}.
+- Allowed motion: ${arvMinimalSignalGeometryPreset.motionRules.allowedMotion.join(', ')}.
+- Forbidden motion: ${arvMinimalSignalGeometryPreset.motionRules.forbiddenMotion.join(', ')}.
+- Negative prompt: ${arvMinimalSignalGeometryPreset.negativePrompt}
+
+${referenceStyle ? `
+═══ UPLOADED IMAGE STYLE DNA ═══
+- Summary: ${referenceStyle.summary}
+- Subject focus: ${referenceStyle.subjectFocus}
+- Palette and light: ${referenceStyle.palette}
+- Motion attitude: ${referenceStyle.motion}
+- Prompt DNA: ${referenceStyle.promptDNA}
+- Keywords: ${referenceStyle.keywords.join(', ') || 'none'}
+
+Use uploaded references only as texture, palette, and signal-language anchors. Do not copy literal subjects unless they are abstract geometry.
+` : ''}
+
+${stylePresets.length > 0 ? `
+═══ SELECTED STYLE PRESETS ═══
+${buildPresetInstructionBlock(stylePresets)}
+` : ''}
+
+═══ ENGINE RULES ═══
+- Generate abstract geometry only: no characters, no faces, no landscapes, no readable text, no logos.
+- Use one dominant central motif and one controlled event across the four scenes.
+- Keep the camera locked and the frame sparse with large negative space.
+- Each scene prompt must be 45-75 words, lean, concrete, and render-ready for Sora.
+- Each clip may be 4, 8, or 12 seconds. Timing language must stretch cleanly across those durations.
+- The four scenes must form one connected loop: reveal, micro-shift, active hold, clean return.
+- Do not drift into corporate motion graphics, over-detailed cyberpunk HUD, glossy 3D logo work, festival VJ clutter, or frantic glitch.
+
+═══ OUTPUT FORMAT ═══
+Return ONLY valid JSON. No markdown, no commentary.
+{
+  "storyTitle": "short title for this signal geometry loop",
+  "storyConcept": "1-2 sentence summary of the abstract signal system",
+  "subject": "the exact central geometric signal object",
+  "microMotion": "reveal -> shift -> hold -> resolve -> return",
+  "negativePrompt": "comma-separated exclusions",
+  "scenes": [
+    { "beat": "freeze", "title": "string", "prompt": "Sora prompt", "motion": "first-frame reveal and latent motion" },
+    { "beat": "onset", "title": "string", "prompt": "Sora prompt", "motion": "micro-shift and signal split" },
+    { "beat": "hold", "title": "string", "prompt": "Sora prompt", "motion": "active hold and locked alignment" },
+    { "beat": "return", "title": "string", "prompt": "Sora prompt", "motion": "collapse or return to clean loop start" }
+  ]
+}`;
+
 // ── JSON extractor ──────────────────────────────────────────────────────────
 
 const extractJson = (raw: string): any => {
@@ -1039,19 +1118,109 @@ const BEAT_STYLES = [
 const STILLFRAME_BASE_SUFFIX =
   'ARV house style only: locked static camera, one dominant subject or event, hard poster readability, lower third kept clean, no text, no logos, no mascot energy. Use tactile scene-specific materials, controlled loop motion, coherent contrast, and adult visual tension. Do not default to archive-witness, paper-cut, monolith, or stone-relic imagery unless the concept explicitly asks for it.';
 
+// ── Random scene (demo mode) ─────────────────────────────────────────────────
+
+const RANDOM_SCENE_SUBJECTS = [
+  'a slowly rotating chrome torus suspended in black void',
+  'a dense field of magnetic iron filings reacting to an unseen pulse',
+  'a single suspended droplet of mercury catching cold light',
+  'a wall of analog tape reels breathing in and out',
+  'a cracked obsidian monument leaking thin smoke',
+  'a cluster of glass capillaries pumping faint neon fluid',
+  'a micro-city skyline pressed flat onto a spinning vinyl record',
+  'a tangle of fiber-optic cables glowing from deep inside',
+  'a slab of wet black stone with luminous fault lines',
+  'a hovering ring of brushed steel shedding fine sparks',
+  'a deep server reef of blinking circuitry underwater',
+  'a desert dune surface crawling with thin magnetic ridges',
+  'a translucent membrane stretched over a resonating frame',
+  'a column of suspended ash holding a frozen explosion shape',
+  'a bank of CRT monitors flickering with one synchronized wave',
+];
+
+const RANDOM_SCENE_MOODS = [
+  'cold industrial calm',
+  'tense pre-storm pressure',
+  'hypnotic ritual focus',
+  'deep submerged stillness',
+  'electric nocturnal unease',
+  'sacred mechanical reverence',
+  'minimal brutalist silence',
+  'warm decaying nostalgia',
+];
+
+const RANDOM_SCENE_PALETTES = [
+  'desaturated steel blue with a single warm amber accent',
+  'near-black with cold cyan rim light',
+  'bone white and deep graphite with faint magenta',
+  'oxidized copper and dark teal',
+  'monochrome charcoal with one bioluminescent green core',
+  'ash grey with bruised violet shadows',
+];
+
+const RANDOM_SCENE_MOTIONS = [
+  'one slow continuous rotation that never fully completes',
+  'a single travelling pulse that crosses the frame and returns',
+  'a sustained low-frequency oscillation with visible material stress',
+  'a slow inhale-and-exhale swell of the whole subject',
+  'fine particles drifting in a controlled magnetic current',
+  'an elastic overshoot that settles back toward the opening pose',
+];
+
+interface RandomSceneSeed {
+  subject: string;
+  mood: string;
+  palette: string;
+  motion: string;
+}
+
+const pickRandom = <T,>(list: readonly T[]): T => list[Math.floor(Math.random() * list.length)];
+
+const buildRandomSceneSeed = (): RandomSceneSeed => ({
+  subject: pickRandom(RANDOM_SCENE_SUBJECTS),
+  mood: pickRandom(RANDOM_SCENE_MOODS),
+  palette: pickRandom(RANDOM_SCENE_PALETTES),
+  motion: pickRandom(RANDOM_SCENE_MOTIONS),
+});
+
+const RANDOM_SCENE_SYSTEM_PROMPT = `You are a cinematic text-to-video prompt writer for "Stillframe Rituals" — single locked-camera loop clips made for AI video generation via Sora.
+
+Write exactly ONE standalone scene prompt. Rules:
+- 45-75 words, lean, concrete, render-ready. No preamble, no quotes, no markdown, no list — output only the prompt sentence(s).
+- Locked static camera. One dominant subject and one dominant motion family.
+- Visible continuous movement from the first frame; loop-ready so the end can hand back to the start.
+- Abstract / material / atmospheric. No readable text, no logos, no recognizable characters or faces, no strobe or harsh flashing.
+- Use tactile, scene-specific materials, coherent contrast, and strong poster readability.`;
+
+const buildRandomScenePromptRequest = (seed: RandomSceneSeed): string =>
+  `Write one Sora text-to-video prompt for this seed.
+Subject: ${seed.subject}.
+Mood: ${seed.mood}.
+Color palette: ${seed.palette}.
+Dominant motion: ${seed.motion}.
+${STILLFRAME_BASE_SUFFIX}`;
+
+const buildFallbackScenePrompt = (seed: RandomSceneSeed): string =>
+  `Locked static camera on ${seed.subject}, lit in ${seed.palette}, carrying a mood of ${seed.mood}. ` +
+  `From the first frame the scene is already alive with ${seed.motion}, motion visible and continuous, ` +
+  `loop-ready so the final frame resolves back toward the opening pose. ` +
+  `Tactile materials, coherent contrast, hard poster readability, no text, no logos, no characters, no strobe.`;
+
 // ── Routes ──────────────────────────────────────────────────────────────────
+
 
 export const createStillframeRoutes = () => {
   const router = Router();
 
   /**
    * POST /api/stillframe/ideas
-   * Body: { seed?: string, mode?: 'ritual'|'satire', keywords?: string[], referenceStyle?: {...} }
+  * Body: { seed?: string, mode?: 'ritual'|'satire'|'signal', keywords?: string[], referenceStyle?: {...} }
    * Returns: { themes, characters, events, actions, stories, styles, promptSeeds, presetSeeds, visions, clipboardText, usage }
    */
   router.post('/api/stillframe/ideas', async (req, res) => {
     try {
-      const mode = asNonEmptyString(req.body?.mode)?.toLowerCase() === 'satire' ? 'satire' : 'ritual';
+      const rawMode = asNonEmptyString(req.body?.mode)?.toLowerCase();
+      const mode = rawMode === 'satire' ? 'satire' : rawMode === 'signal' ? 'signal' : 'ritual';
       const seed = asNonEmptyString(req.body?.seed);
       const variationSeed = asNonEmptyString(req.body?.variationSeed) || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const keywords = normalizeKeywords(req.body?.keywords);
@@ -1066,7 +1235,12 @@ export const createStillframeRoutes = () => {
           keywords: normalizeIdeaList(rawReferenceStyle.keywords, 8),
         } satisfies StillframeReferenceStyleSummary
         : null;
-      const stylePresets = selectStillframeStylePresets(seed, keywords, referenceStyle);
+      const stylePresets = selectStillframeStylePresets(
+        seed,
+        mode === 'signal' ? [...keywords, ...arvMinimalSignalGeometryPreset.tags] : keywords,
+        referenceStyle,
+        mode === 'signal' ? [arvMinimalSignalGeometryPreset.id] : [],
+      );
       const client = getAzureClient();
       const model = getAzureModel();
 
@@ -1090,6 +1264,8 @@ Rules:
 - Preset seeds must describe a clear visual direction in one compact line.
 - ${mode === 'satire'
               ? 'For satire mode, ideas must obey Subject / Surface / Motion / Transformation / Loop logic and derive wit from visual contradiction, damaged print iconography, and mechanical residue instead of explanatory politics.'
+              : mode === 'signal'
+                ? 'For signal geometry mode, ideas must be abstract black-background CRT geometry: motifs, line systems, dots, bars, orbital frames, chromatic edge split, one micro-motion event, no characters, no faces, no landscapes, no readable text.'
               : 'For ritual mode, ideas must imply a loop-ready four-beat motion arc, one dominant subject or event, material continuity, and a physically legible story world.'}
 - Return exactly this JSON shape:
 {
@@ -1310,6 +1486,117 @@ Rules:
   });
 
   /**
+   * POST /api/stillframe/signal
+   * Body: { prompt?: string, motif?: string, motionEvent?: string, referenceImages?: Array<{ ... }> }
+   * Returns: { storyTitle, storyConcept, subject, microMotion, negativePrompt, stylePresets, referenceStyle, scenes[], model, usage }
+   */
+  router.post('/api/stillframe/signal', async (req, res) => {
+    try {
+      const prompt = asNonEmptyString(req.body?.prompt);
+      const motif = asNonEmptyString(req.body?.motif) || arvMinimalSignalGeometryPreset.defaultMotifs[0];
+      const motionEvent = asNonEmptyString(req.body?.motionEvent) || arvMinimalSignalGeometryPreset.defaultMotionEvents[0];
+      const referenceImages = normalizeReferenceImages(req.body?.referenceImages);
+      const referenceStyleOverride = normalizeReferenceStyleOverride(req.body?.referenceStyleOverride);
+
+      const client = getAzureClient();
+      const model = getAzureModel();
+      let referenceStyleResult: Awaited<ReturnType<typeof analyzeStillframeReferenceImages>> | null = null;
+
+      if (referenceImages.length > 0) {
+        try {
+          referenceStyleResult = await analyzeStillframeReferenceImages(client, referenceImages);
+        } catch (referenceError) {
+          console.error('Stillframe Signal Referenzstil Fehler:', referenceError);
+          return res.status(500).json({
+            error: toErrorMessage(
+              referenceError,
+              'Bildreferenzen konnten nicht analysiert werden. Bitte pruefe, ob ein vision-faehiges Azure OpenAI Modell konfiguriert ist.',
+            ),
+          });
+        }
+      }
+
+      const presetReferenceStyle = applyReferenceStyleOverride({
+        summary: arvMinimalSignalGeometryPreset.description,
+        subjectFocus: motif,
+        palette: 'Deep black and near-black CRT grey with electric cyan, hot magenta, warm ivory, ember orange, and dirty white signal accents.',
+        motion: `${arvMinimalSignalGeometryPreset.motionRules.rhythm}. ${motionEvent}`,
+        promptDNA: arvMinimalSignalGeometryPreset.promptCore,
+        keywords: [...arvMinimalSignalGeometryPreset.tags],
+      }, referenceStyleOverride);
+      const referenceStyle = applyReferenceStyleOverride(referenceStyleResult?.style ?? presetReferenceStyle, referenceStyleOverride)
+        || presetReferenceStyle;
+      const stylePresets = selectStillframeStylePresets(
+        [prompt, motif, motionEvent, arvMinimalSignalGeometryPreset.name].filter(Boolean).join('. '),
+        [...arvMinimalSignalGeometryPreset.tags, motif, motionEvent],
+        referenceStyle,
+        [arvMinimalSignalGeometryPreset.id],
+      );
+
+      const response = await client.chat.completions.create({
+        model,
+        messages: [
+          { role: 'developer', content: buildMinimalSignalGeometrySystemPrompt(stylePresets, referenceStyle) },
+          {
+            role: 'user',
+            content: [
+              `Freeform seed: ${prompt || 'none'}`,
+              `Chosen motif: ${motif}`,
+              `Chosen motion event: ${motionEvent}`,
+              `Generation template:\n${arvMinimalSignalGeometryPreset.generationPromptTemplate}`,
+              referenceStyle
+                ? `Reference style summary: ${referenceStyle.summary}\nReference palette: ${referenceStyle.palette}\nReference motion: ${referenceStyle.motion}\nReference prompt DNA: ${referenceStyle.promptDNA}`
+                : 'Reference style: none',
+              'Generate four connected Minimal Signal Geometry scenes. Keep them abstract, sparse, black-background, loop-ready, and Sora-safe.',
+            ].join('\n\n'),
+          },
+        ],
+      } as any);
+
+      const rawText = asNonEmptyString(response.choices?.[0]?.message?.content ?? '');
+      if (!rawText) throw new Error('Signal geometry generation returned an empty response.');
+
+      const data = extractJson(rawText);
+      if (!Array.isArray(data?.scenes) || data.scenes.length < 4) {
+        throw new Error('Signal geometry engine did not return four scenes.');
+      }
+
+      const usage = mergeUsageSummaries(
+        toUsageSummary(response.usage),
+        referenceStyleResult?.usage,
+      );
+
+      return res.json({
+        success: true,
+        mode: 'signal',
+        model,
+        usage,
+        presetId: arvMinimalSignalGeometryPreset.id,
+        motif,
+        motionEvent,
+        keywords: [...arvMinimalSignalGeometryPreset.tags, motif, motionEvent],
+        stylePresets: stylePresets.map(summarizePreset),
+        referenceStyle,
+        referenceImageCount: referenceImages.length,
+        storyTitle: data.storyTitle ?? 'Minimal Signal Geometry',
+        storyConcept: data.storyConcept ?? `${motif}. ${motionEvent}`,
+        subject: data.subject ?? motif,
+        microMotion: data.microMotion ?? motionEvent,
+        negativePrompt: data.negativePrompt ?? arvMinimalSignalGeometryPreset.negativePrompt,
+        scenes: data.scenes.slice(0, 4).map((scene: any, index: number) => ({
+          beat: scene.beat ?? ['freeze', 'onset', 'hold', 'return'][index],
+          title: scene.title ?? `Signal Beat ${index + 1}`,
+          prompt: scene.prompt ?? '',
+          motion: scene.motion ?? '',
+        })),
+      });
+    } catch (error) {
+      console.error('Stillframe signal geometry Fehler:', error);
+      return res.status(500).json({ error: toErrorMessage(error, 'Stillframe signal geometry generation failed') });
+    }
+  });
+
+  /**
    * POST /api/stillframe/satire
    * Body: { prompt?: string, presetProfileId?: string, selectedElementIds?: string[], referenceImages?: [], currentSketch?: ARVSatireSketch }
    * Returns: { satireSketch, storyTitle, storyConcept, stylePresets, scenes[], usage }
@@ -1513,7 +1800,7 @@ Rules:
 
   /**
    * POST /api/stillframe/polish
-   * Body: { prompt: string, beat?: string, title?: string, motion?: string, mode?: 'ritual'|'satire', storyTitle?: string, storyConcept?: string, stylePresetIds?: string[], referenceStyle?: {...} }
+  * Body: { prompt: string, beat?: string, title?: string, motion?: string, mode?: 'ritual'|'satire'|'signal', storyTitle?: string, storyConcept?: string, stylePresetIds?: string[], referenceStyle?: {...} }
    * Returns: { prompt, model, usage }
    */
   router.post('/api/stillframe/polish', async (req, res) => {
@@ -1525,7 +1812,8 @@ Rules:
 
       const promptCore = extractPromptCore(prompt) || prompt.trim();
 
-      const mode = asNonEmptyString(req.body?.mode)?.toLowerCase() === 'satire' ? 'satire' : 'ritual';
+      const rawMode = asNonEmptyString(req.body?.mode)?.toLowerCase();
+      const mode = rawMode === 'satire' ? 'satire' : rawMode === 'signal' ? 'signal' : 'ritual';
       const beat = asNonEmptyString(req.body?.beat) || 'scene';
       const title = asNonEmptyString(req.body?.title) || 'Untitled scene';
       const motion = asNonEmptyString(req.body?.motion) || '';
@@ -1542,9 +1830,13 @@ Rules:
         .filter((element): element is StillframeSatireElementOption => Boolean(element));
       const modePolishRuleA = mode === 'satire'
         ? 'For satire mode, compress the scene into one iconic image plate: one subject, one surface logic, one mechanical motion, one visual transformation, one residue return.'
+        : mode === 'signal'
+          ? 'For signal geometry mode, preserve abstract black-background CRT geometry: one central motif, thin linework, one micro-motion event, large negative space, and a clean lock or collapse.'
         : 'For ritual story mode, preserve physical handoff logic and make the scene feel like one section of a continuous four-beat loop.';
       const modePolishRuleB = mode === 'satire'
         ? 'For satire mode, favor damaged print iconography, hard poster-readability, analog contradiction, and visual compression over narrative explanation.'
+        : mode === 'signal'
+          ? 'For signal geometry mode, remove characters, faces, landscapes, readable text, logo energy, glossy 3D, busy HUD detail, and chaotic glitch; keep the prompt technical, sparse, and loop-legible.'
         : 'For ritual story mode, favor inherited end-state, material depth, and sustained rhythmic motion over isolated poster-tableau logic.';
       const satirePresetProfileLine = satirePresetProfile
         ? `Satire preset profile: ${satirePresetProfile.name} — ${satirePresetProfile.description}`
@@ -1562,7 +1854,7 @@ Rules:
         messages: [
           {
             role: 'developer',
-            content: `You polish one Stillframe scene prompt for ${mode === 'satire' ? 'the satire sketch mode' : 'the story mode'} using GPT-5.2-chat.
+            content: `You polish one Stillframe scene prompt for ${mode === 'satire' ? 'the satire sketch mode' : mode === 'signal' ? 'the Minimal Signal Geometry mode' : 'the story mode'} using GPT-5.2-chat.
 
 ${buildStillframeStyleLock(stylePresets, referenceStyle)}
 
@@ -1662,13 +1954,15 @@ Rules:
         },
       );
 
-      const imageModel =
-        (process.env.AZURE_OPENAI_IMAGE_DEPLOYMENT || 'gpt-image-1').trim();
+      const configuredImageModel = asNonEmptyString(process.env.AZURE_OPENAI_IMAGE_DEPLOYMENT);
+      const imageModel = configuredImageModel?.toLowerCase() === 'gpt-image-1'
+        ? undefined
+        : configuredImageModel;
 
       const result = await foundryImageGenerate({
         prompt: finalPrompt,
         size: '1024x1024',
-        quality: 'standard',
+        quality: 'auto',
         model: imageModel,
       });
 
@@ -1710,9 +2004,7 @@ Rules:
       const stylePresets = resolveStillframeRequestStylePresets(req.body?.stylePresetIds);
       const referenceStyle = normalizeReferenceStyleSummary(req.body?.referenceStyle);
 
-      const requestedSeconds = Number.isFinite(Number(req.body?.seconds))
-        ? Math.max(4, Math.min(6, Number(req.body.seconds)))
-        : 5;
+      const requestedSeconds = normalizeSoraVideoSeconds(req.body?.seconds);
       const remixVideoId = asNonEmptyString(req.body?.remixVideoId);
       const videoTransform = remixVideoId
         ? (req.body?.videoTransform === 'extend' ? 'extend' : 'remix')
@@ -1786,10 +2078,12 @@ Rules:
         }
 
         if (VIDEO_SUCCESS_STATUSES.has(status)) {
+          const resolvedVideoId = job.videoId || job.id;
+
           if (job.videoUrl) {
             return res.json({
               success: true,
-              videoId: job.id,
+              videoId: resolvedVideoId,
               jobId: job.id,
               status,
               videoUrl: job.videoUrl,
@@ -1798,7 +2092,7 @@ Rules:
               beatStyle,
               debug: {
                 ...debug,
-                resultVideoId: job.id,
+                resultVideoId: resolvedVideoId,
               },
             });
           }
@@ -1807,7 +2101,7 @@ Rules:
             const videoBase64 = await foundryVideoDownload(job.id, deployment);
             return res.json({
               success: true,
-              videoId: job.id,
+              videoId: resolvedVideoId,
               jobId: job.id,
               status,
               videoBase64,
@@ -1816,7 +2110,7 @@ Rules:
               beatStyle,
               debug: {
                 ...debug,
-                resultVideoId: job.id,
+                resultVideoId: resolvedVideoId,
               },
             });
           } catch {
@@ -1837,5 +2131,109 @@ Rules:
     }
   });
 
+  /**
+   * POST /api/stillframe/random-video
+   * Schreibt selbst einen frischen Text-to-Video-Prompt und rendert daraus
+   * ein zufälliges Sora-Video (Demo-Mode). Optionaler Body: { seconds?: number }
+   * Returns: { success, prompt, seed, videoId, jobId, status, seconds, videoUrl?, videoBase64? }
+   */
+  router.post('/api/stillframe/random-video', async (req, res) => {
+    try {
+      const requestedSeconds = normalizeSoraVideoSeconds(req.body?.seconds ?? SORA_DEFAULT_VIDEO_SECONDS);
+      const seed = buildRandomSceneSeed();
+
+      let generatedPrompt = '';
+      try {
+        const completion = await foundryGenerateText(
+          buildRandomScenePromptRequest(seed),
+          RANDOM_SCENE_SYSTEM_PROMPT,
+          getAzureModel(),
+        );
+        generatedPrompt = asNonEmptyString(completion.text)?.replace(/^["'\s]+|["'\s]+$/g, '') || '';
+      } catch (promptError) {
+        console.warn('Random-Video Prompt-Generierung fehlgeschlagen, nutze Fallback:', promptError);
+      }
+
+      const finalPrompt = generatedPrompt || buildFallbackScenePrompt(seed);
+
+      const deployment =
+        (process.env.AZURE_OPENAI_VIDEO_DEPLOYMENT || process.env.AZURE_VIDEO_MODEL || 'sora-2').trim();
+
+      let job = await foundryVideoCreate({
+        prompt: finalPrompt,
+        deployment,
+        size: '1280x720',
+        seconds: requestedSeconds,
+      });
+
+      if (!job.id) throw new Error('Azure Sora lieferte keine Job-ID zurück.');
+
+      const startedAt = Date.now();
+
+      while (Date.now() - startedAt < VIDEO_MAX_WAIT_MS) {
+        const status = job.status;
+
+        if (VIDEO_FAILURE_STATUSES.has(status)) {
+          return res.status(500).json({
+            error: job.error || 'Azure Sora video generation failed.',
+            status,
+            videoId: job.id,
+            jobId: job.id,
+            prompt: finalPrompt,
+          });
+        }
+
+        if (VIDEO_SUCCESS_STATUSES.has(status)) {
+          const resolvedVideoId = job.videoId || job.id;
+
+          if (job.videoUrl) {
+            return res.json({
+              success: true,
+              prompt: finalPrompt,
+              seed,
+              videoId: resolvedVideoId,
+              jobId: job.id,
+              status,
+              videoUrl: job.videoUrl,
+              seconds: requestedSeconds,
+            });
+          }
+
+          try {
+            const videoBase64 = await foundryVideoDownload(job.id, deployment);
+            return res.json({
+              success: true,
+              prompt: finalPrompt,
+              seed,
+              videoId: resolvedVideoId,
+              jobId: job.id,
+              status,
+              videoBase64,
+              seconds: requestedSeconds,
+            });
+          } catch {
+            await sleep(VIDEO_POLL_INTERVAL_MS);
+            job = await foundryVideoRetrieve(job.id, deployment);
+            continue;
+          }
+        }
+
+        await sleep(VIDEO_POLL_INTERVAL_MS);
+        job = await foundryVideoRetrieve(job.id, deployment);
+      }
+
+      return res.status(504).json({
+        error: 'Timeout: Azure Sora hat die Zeit überschritten.',
+        videoId: job.id,
+        jobId: job.id,
+        prompt: finalPrompt,
+      });
+    } catch (error) {
+      console.error('Stillframe random-video Fehler:', error);
+      return res.status(500).json({ error: toErrorMessage(error, 'Random video generation failed') });
+    }
+  });
+
   return router;
 };
+

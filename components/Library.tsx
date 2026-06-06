@@ -327,6 +327,7 @@ function IdeaPackCard({
     { label: 'Prompt Seeds', items: item.promptSeeds },
     { label: 'Preset Seeds', items: item.presetSeeds },
   ];
+  const modeLabel = item.mode === 'satire' ? 'Satire' : item.mode === 'signal' ? 'Signal' : 'Ritual';
 
   return (
     <div className="bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
@@ -334,7 +335,7 @@ function IdeaPackCard({
         <div className="flex items-center justify-between gap-3">
           <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-fuchsia-100 dark:bg-fuchsia-900/30 text-fuchsia-700 dark:text-fuchsia-300">
             <Sparkles size={11} />
-            Ideenpack · {item.mode === 'satire' ? 'Satire' : 'Ritual'}
+            Ideenpack · {modeLabel}
           </span>
           <span className="text-xs text-stone-300 dark:text-zinc-500">{formatDate(item.createdAt)}</span>
         </div>
@@ -347,7 +348,7 @@ function IdeaPackCard({
         <div className="flex flex-wrap gap-2 text-[11px] text-fuchsia-100/80">
           <span>{item.visions.length} Vision Cards</span>
           <span>·</span>
-          <span>{item.promptSeeds.length} Prompt Seeds</span>
+              <span>{item.promptSeeds.length} Prompt Seeds</span>
           <span>·</span>
           <span>{item.presetSeeds.length} Preset Seeds</span>
         </div>

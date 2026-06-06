@@ -3,15 +3,18 @@
 - STORY_PRESET_PROMPT_TEMPLATES in lib/promptTemplates.ts maps preset example prompts into story prompts.
 - STORY_ENGINE_MASTER_ADDITION in lib/storyboardTuning.ts is a high-leverage global suffix; change it together with EN/DE storytelling rules when story outputs feel too calm or generic.
 - Validation for story prompt changes: npm run typecheck, then npm run build.
+- Sora video duration must stay fixed to supported values 4, 8, or 12 seconds; UI defaults to 4s and server routes normalize incoming seconds to the nearest supported value.
 - Story arc selection now flows end-to-end through components/StoryMode.tsx -> /api/openai|gemini|foundry/storyboard -> lib/storyboardTuning.ts and server/utils/storyboard.ts.
 - Story scenes now use fixed structural beats in order: emergence, lock-in, peak, afterimage.
 - UI exposes two arc modes: iconic (series-ident pressure, dominant hero moments) and cinematic (more connective sequence flow).
 - Stillframe prompt control now centers on components/StillframeHarness.tsx plus server/routes/stillframeRoutes.ts; batch polish reuses /api/stillframe/polish sequentially across all four scenes.
 - Stillframe sketch/video requests must carry the active stylePresetIds and referenceStyle from StillframeHarness; server/routes/stillframeRoutes.ts should extract the prompt core before reapplying render locks so polished prompts are not weakened by a generic fallback lock.
 - Stillframe, StoryMode, Foundry, and OpenAI video derivations now keep remixVideoId as the source clip id, but the actual operation must be explicit: use `videoTransform: 'remix'` for edit-style changes and `videoTransform: 'extend'` for continuations, and route Azure through services/foundryService.ts via `/videos/edits` or `/videos/extensions` instead of sending `remix_video_id` to `POST /videos`.
+- Azure Foundry video create/retrieve/download can expose a polling job id that is not always the reusable source-video resource id for later remix/extend calls; when returning video metadata to the UI, preserve `jobId` separately and prefer a result-level video id from the provider payload when available.
 - IQ scene enrichment now routes through server/utils/iq.ts; StoryMode and Stillframe should send iqContext, but prompt augmentation must still happen inside withStyleTaste via userStyleContext so extractPromptCore remains reusable for later remixes and rerenders.
 - Editable Stillframe reference DNA roundtrips as referenceStyleOverride from the UI back into /api/stillframe/concept and /api/stillframe/satire before preset selection and prompt generation.
 - Stillframe now also has an ideas generator in components/StillframeHarness.tsx backed by /api/stillframe/ideas; it returns themes, characters, events, actions, stories, styles, prompt seeds, preset seeds, and 4 vision cards with copy/use actions.
+- Stillframe has three compose engines: ritual story beats via /api/stillframe/concept, satire sketch via /api/stillframe/satire, and Minimal Signal Geometry via /api/stillframe/signal using lib/minimalSignalGeometryPreset.ts.
 - Good Stillframe ideas packs can now be stored in the library as a dedicated `ideas` item type; Library.tsx renders them with copy/download/expand actions.
 - Saved ideas packs can also trigger a direct remix flow from the library into Stillframe; App.tsx writes a small sessionStorage bootstrap payload and StillframeHarness.tsx auto-starts a fresh /api/stillframe/ideas run from it on mount.
 - Vision cards in Stillframe can now trigger direct 4-beat generation for both ritual and satire modes by reusing the existing concept/satire fetch flows instead of a separate generation route.
