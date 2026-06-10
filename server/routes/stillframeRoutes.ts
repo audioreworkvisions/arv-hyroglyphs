@@ -215,7 +215,7 @@ const normalizeStillframeIdeaVision = (value: unknown, index: number): Stillfram
     character: asNonEmptyString(candidate.character) || 'one dominant form, system, or force',
     event: asNonEmptyString(candidate.event) || 'A clear visual event breaks the stillness.',
     action: asNonEmptyString(candidate.action) || 'The scene shifts, reacts, folds, or releases pressure.',
-    story: story || 'A tactile image-world opens into a loop-ready four-beat arc.',
+    story: story || 'A tactile image-world opens into a connected four-scene arc.',
     style: asNonEmptyString(candidate.style) || asNonEmptyString(candidate.styleDirection) || 'Raw abstract ARV loop logic with geometric forms, ugly-bright color slips, underground texture, and visible reset motion.',
     promptSeed: promptSeed || story || 'One dominant geometric form or absurd object, readable motion, analog damage, brave color, and a clear snapback loop.',
     presetSeed: asNonEmptyString(candidate.presetSeed) || 'Base preset: raw ARV loop direction with abstract geometry, controlled signal motion, and no default archive or witness motifs.',
@@ -366,9 +366,9 @@ Rules:
 Visual grammar:
 - Subject: a single form, machine, field, aperture, synthetic organism, or architectural system.
 - Surface: matte dust, fogged glass, lacquered metal, scanline haze, wet reflection, grain, sediment, or soft signal residue.
-- Motion: only one pressure pulse, panel shift, slit opening, drift change, wave sweep, or contour split.
-- Transformation: the motion causes an afterimage, a phase shift, a duplicate echo, a pressure flare, or a controlled color slip.
-- Loop: the image collapses back into the opening pose, leaving a faint analog residue.
+- Motion: free and expressive — pressure pulses, panel shifts, slit openings, drifts, wave sweeps, contour splits, travel, rotation, or growth, as long as the image stays readable.
+- Transformation: motion may cause afterimages, phase shifts, duplicate echoes, pressure flares, color slips, or full metamorphosis.
+- Loop: each scene should be able to hand its end back to its start.
 
 Preset profile:
 - Name: ${presetProfile.name}
@@ -394,11 +394,11 @@ ${selectedCharacters.map((character) => [
   `Transmission style: ${character.transmissionStyle}`,
 ].join('\n')).join('\n\n')}
 
-Beat mapping:
-- Scene 1: establish the subject and surface in a frozen iconic pose.
-- Scene 2: introduce the single permitted motion and first visual rupture.
-- Scene 3: let the transformation peak while the frame remains clean and loopable.
-- Scene 4: collapse the image back into the opening pose with faint analog residue.
+Scene mapping:
+- Scene 1: establish the subject and surface with motion already alive in the frame.
+- Scene 2: develop the motion and the first visual rupture in whatever direction serves the sketch.
+- Scene 3: let the transformation peak freely while the frame stays readable and loopable.
+- Scene 4: resolve the arc in its own way — collapse, escalation, departure, or return are all valid.
 
 Write every scene like a damaged liturgical print recovered from an unknown analog machine cult.
 `;
@@ -793,10 +793,6 @@ const buildStillframeStyleLock = (
     preset: basePreset || undefined,
     styleMode: 'loose',
     extraNotes: [
-      'Stillframe should feel like raw early-ARV loop video: abstract forms, analog damage, brave color collisions, and one unmistakable reset event.',
-      'Prefer one dominant geometric form, absurd object, or event in a sparse readable frame with clear contrast and a lower third kept clean.',
-      'Let the material system, palette, and world logic change with the concept: raw signal geometry, damaged flyer worlds, underground room fragments, industrial scraps, synthetic organisms, microscopic fields, and absurd objects are all valid.',
-      'Use presets as sampled ingredients, not cages. Do not inject paper-cut figures, archive drawers, monolith idols, witness forms, or stone relics unless the concept or reference explicitly asks for them.',
       ...(referenceStyle ? [
         `Uploaded image DNA: ${referenceStyle.summary}`,
         `Uploaded image palette and light: ${referenceStyle.palette}`,
@@ -813,7 +809,6 @@ interface StillframeRenderPromptDebug {
   rawPrompt: string;
   cleanedPrompt: string;
   finalPrompt: string;
-  beatStyle?: string;
   renderMode?: 'create' | 'remix' | 'extend';
   sourceVideoId?: string | null;
   resultVideoId?: string | null;
@@ -836,14 +831,9 @@ const buildStillframeRenderPrompt = async (
 ): Promise<{
   promptCore: string;
   finalPrompt: string;
-  beatStyle?: string;
   iqBrief: IQBrief | null;
 }> => {
   const { beatIndex, renderTarget, purpose, remixVideoId, iqContext } = options;
-  const beatStyle =
-    beatIndex != null && beatIndex >= 0 && beatIndex <= 3
-      ? BEAT_STYLES[beatIndex]
-      : undefined;
   const promptCore = extractPromptCore(prompt) || prompt.trim();
   const [basePreset, ...accentPresets] = stylePresets.length > 0
     ? stylePresets
@@ -867,9 +857,6 @@ const buildStillframeRenderPrompt = async (
     styleMode: 'loose',
     userStyleContext: iqBrief?.promptBlock ?? null,
     extraNotes: [
-      'Stillframe lock: keep one dominant geometric form, absurd object, or event, sparse composition, hard contrast, and strong first-frame readability.',
-      'Stillframe lock: movement may be visibly alive, but it must stay deliberate, hypnotic, GIF-loop-legible, and visibly resettable rather than hectic.',
-      'Stillframe lock: let the concept choose the world, palette, and material logic; sample presets without injecting old archive-witness defaults by habit.',
       ...(referenceStyle ? [
         `Reference style DNA: ${referenceStyle.summary}`,
         `Reference style palette and light: ${referenceStyle.palette}`,
@@ -879,15 +866,13 @@ const buildStillframeRenderPrompt = async (
       ...accentPresets.map(
         (preset, index) => `Accent ${index + 1}: ${preset.name} — ${preset.visualIdentity || preset.shortPrompt || preset.atmosphere}`,
       ),
-      ...(beatStyle ? [beatStyle] : []),
     ],
   });
 
   return {
     promptCore,
-    finalPrompt: `${styledPrompt}\n\nStillframe render lock:\n- ${STILLFRAME_BASE_SUFFIX}`,
+    finalPrompt: styledPrompt,
     iqBrief,
-    ...(beatStyle ? { beatStyle } : {}),
   };
 };
 
@@ -909,16 +894,15 @@ const buildStillframeSystemPrompt = (
   stylePresets: StylePreset[],
   keywords: string[],
   referenceStyle?: StillframeReferenceStyleSummary | null,
-): string => `You are a raw ARV loop-beat generator for "Stillframe Rituals" — locked-camera GIF-like loop sequences with one dominant abstract form or event, visible continuous movement, and strong handoff logic made for AI video generation via Sora.
+): string => `You are a scene generator for "Stillframe Rituals" — GIF-like loop sequences with visible continuous movement, made for AI video generation via Sora.
 
-═══ ARV HOUSE STYLE LOCK ═══
+═══ STYLE CONTEXT ═══
 ${buildStillframeStyleLock(stylePresets, referenceStyle)}
 
 ═══ STILLFRAME FOUNDATION ═══
-- Keep the camera locked or nearly locked and put the motion pressure inside the subject, light, residue, or duplicated signal traces.
-- Every result must feel like raw ARV: adult, sparse, tactile, abstract-capable, absurdly specific, visually precise, and instantly readable.
-- Favor hard poster-like first-frame readability and visible loop mechanics over atmospheric wallpaper.
-- Translate all keyword and preset signals into concrete form, color, material, and motion language rather than literal theme labels or old house-style clichés.
+- The style spectrum is open: let the concept choose its own world, palette, materials, mood, and visual language.
+- Camera movement is allowed and welcome when it serves the scene: drifts, pushes, orbits, pans, tilts, or a locked frame are all valid choices.
+- Translate keyword and preset signals into concrete form, color, material, and motion language.
 
 ${referenceStyle ? `
 ═══ UPLOADED IMAGE STYLE DNA ═══
@@ -937,58 +921,44 @@ ${stylePresets.length > 0 ? `
 ═══ SELECTED STYLE PRESETS ═══
 ${buildPresetInstructionBlock(stylePresets)}
 
-Use the base preset as ignition material. Use the accent presets to push scene-to-scene diversity in form language, color behavior, material grit, and loop motion while preserving one coherent ARV world.
+Use the presets as ignition material, not as cages. Push scene-to-scene diversity in form language, color behavior, material grit, and motion.
 Do not mention preset names in the JSON output. Translate them into physical detail.
 ` : ''}
 
 ${keywords.length > 0 ? `
 ═══ KEYWORD SIGNALS ═══
 Keywords: ${keywords.join(', ')}
-Treat the keywords as high-priority seeds for the subject, materials, lighting events, and motion arc, but do not let them pull the result out of the ARV family.
+Treat the keywords as high-priority seeds for the subject, materials, lighting events, and motion arc.
 ` : ''}
-
-═══ STYLE DRIFT PROHIBITIONS ═══
-NEVER drift into any of the following:
-- cute or playful mascots, smiling faces, big eyes, toy-like characters
-- pastel candy palettes, glossy toy-like 3D, anime/Pixar/Disney language
-- decorative pseudo-sacred illustration, readable sacred text, fake inscriptions, tourist-myth staging
-- photoreal people, expressive acting, crowd scenes, busy narrative clutter
-- generic luxury abstract spectacle, random geology wallpaper, empty sci-fi moodboards, or clean corporate motion graphics with no ARV identity
-- defaulting automatically to paper-cut witnesses, archive machinery, monolith idols, codex worlds, or stone relics when the concept does not ask for them
-
-Allowed when rendered as clear ARV image logic rather than decorative filler:
-- primitive shapes, structures, pressure cores, silhouettes, machines, diagrams, scanner bands, color blocks, fields, fluids, particles, ecologies, light events, and other concept-specific forms with strong first-frame readability
 
 ═══ PROMPT QUALITY RULES — CRITICAL ═══
 Each scene "prompt" sent to Sora must be:
 1. LEAN: 50–80 words maximum. Every word must earn its place. Zero filler.
 2. NON-REDUNDANT: Never repeat the same information twice. Name each quality ONCE.
-3. SPECIFIC: Describe exact ARV physical states, not vague moods. Not "dark and mysterious" — say "cyan-magenta misregistration shivers along one dirty white scanner edge while an acid-lime dot snaps back into black."
-4. DEPTH-FIRST: The prompt must encode tactile depth through material specificity, light precision, spatial architecture, and one exact loop state.
+3. SPECIFIC: Describe exact physical states, not vague moods. Not "dark and mysterious" — say "cyan-magenta misregistration shivers along one dirty white scanner edge while an acid-lime dot snaps back into black."
+4. DEPTH-FIRST: The prompt must encode tactile depth through material specificity, light precision, and spatial architecture.
 5. NO DECORATIVE ADJECTIVES: No "haunting", "ethereal", "mesmerizing", "evocative". Show, don't describe the feeling.
-6. VISIBLE MOTION: The clip must show readable motion through most of its runtime. Avoid prompts where change happens only in the final frames.
+6. VISIBLE MOTION: The clip must show bold, readable motion through its entire runtime. Subjects travel, transform, rotate, unfold, collide, grow, or collapse. Avoid prompts where the image mostly stands still.
 
 ═══ DIVERSITY RULES ═══
 - The four scenes must feel related, but not interchangeable.
 - Each scene must change at least two of the following: material emphasis, scale, lighting geometry, texture behavior, color accent, silhouette pressure.
 - Do not write four paraphrases of the same frame.
 - Every scene prompt must be strong enough to render as its own GIF loop while still belonging to the same story.
-- Diversity must stay inside the ARV family resemblance, but the four scenes should be free to invent different geometric, material, color, and world behaviors instead of reusing one old canon.
+- The four scenes are free to invent different geometric, material, color, and world behaviors.
 
 ═══ CONTINUITY MODEL ═══
-The four scenes form ONE physical arc. Each clip may be rendered at a Sora-supported 4, 8, or 12 second duration, so write timing that can stretch or compress cleanly without breaking the physical handoff.
-- Scene 1 (freeze): Subject starts nearly settled, but never dead. Low idle motion, drift, pulse, sway, flicker, recoil, or breathing is already present from the first second. The main event should become clearly legible before the clip ends.
-- Scene 2 (onset): Starts at scene 1's exact end-frame physical state. Motion now travels, unfolds, expands, contracts, rotates, spills, or deforms with clear direction and stronger amplitude.
-- Scene 3 (hold): Starts at scene 2's exact final frame. This is the peak state, but it must stay kinetically alive: sustained pulse, vibration, orbit, pressure-wave, oscillation, shedding light, or internal churn. Never turn hold into a static pause.
-- Scene 4 (return): Starts at scene 3's active peak. Reversal or re-coherence begins, but with visible residue: elastic overshoot, aftershocks, echo trails, settling sway, or repeated micro-surges. The end should loop cleanly back toward scene 1.
+The four scenes form ONE story arc. Each clip may be rendered at a Sora-supported 4, 8, or 12 second duration.
+- Each scene chooses its own motion freely: it may accelerate, travel, transform, escalate, calm down, or explode into something new. There are no per-scene motion caps and no mandatory rest states.
+- Let the story build naturally across the four scenes toward whatever shape the concept wants: escalation, journey, metamorphosis, collision, or cycle.
+- Soft continuity is enough: keep the subject family and world logic recognizable from scene to scene. Hard frame-exact handoffs are optional, not required.
+- Each scene should still be loop-friendly on its own, so its end can hand back to its start without a jarring cut.
 
-HANDOFF RULE: Each prompt must open with the inherited physical state from the previous scene's final frame. No hard discontinuity, but elastic residue and soft loop-closure are allowed.
-
-═══ MOTION BOUNDARIES ═══
-- Keep the camera locked, but let the subject move more boldly inside the frame.
-- One dominant motion family is required, but secondary supporting motion is allowed if it clearly belongs to the same physical event.
-- Medium-tempo loop motion is welcome. Avoid only chaotic whip-fast action or unreadable strobing.
-- Favor motion verbs like unfolds, folds back, ripples, rotates, pulses, sways, recoils, vibrates, flickers, misregisters, breathes, tunnels, or sheds residue.
+═══ MOTION FREEDOM ═══
+- Movement is the point: keep subjects and energy visibly in motion through the whole clip.
+- Camera may move freely: slow push-ins, orbits, drifts, tilts, or a locked frame — whatever serves the scene.
+- Multiple motion layers are welcome when they stay readable.
+- Avoid only unreadable strobing and harsh flashing.
 
 ═══ OUTPUT FORMAT ═══
 Return ONLY valid JSON. No markdown, no commentary.
@@ -996,32 +966,32 @@ Return ONLY valid JSON. No markdown, no commentary.
   "storyTitle": "short evocative title",
   "storyConcept": "1-2 sentence summary of the new story world built from the concept and keywords",
   "subject": "concise physical description of the dominant subject",
-  "microMotion": "exact arc: [start state] → [peak state] → [residue state]",
+  "microMotion": "the overall motion arc across the four scenes",
   "negativePrompt": "comma-separated exclusions specific to this concept",
   "scenes": [
     {
-      "beat": "freeze",
+      "beat": "scene-1",
       "title": "string",
-      "prompt": "lean, deep, non-redundant Sora prompt — near-rest with visible idle motion, then a clear movement arc already underway within the clip",
-      "motion": "Near-rest, but alive. [precise physical position]. [Motion event] is already readable, then grows stronger before clip end."
+      "prompt": "lean, deep, non-redundant Sora prompt with bold continuous movement",
+      "motion": "free description of the scene's movement"
     },
     {
-      "beat": "onset",
+      "beat": "scene-2",
       "title": "string",
-      "prompt": "lean, deep, non-redundant Sora prompt — opens at scene 1 end-state, motion travels clearly and gains amplitude",
-      "motion": "Inherits [exact position from scene 1]. [Motion] drives outward, inward, around, or through the form to [new position]."
+      "prompt": "lean, deep, non-redundant Sora prompt with bold continuous movement",
+      "motion": "free description of the scene's movement"
     },
     {
-      "beat": "hold",
+      "beat": "scene-3",
       "title": "string",
-      "prompt": "lean, deep, non-redundant Sora prompt — opens at scene 2 end-state, peak state remains active with sustained oscillation or pulse",
-      "motion": "Inherits [peak position from scene 2]. Peak state stays active through pulse, vibration, orbit, churn, or repeated recoil."
+      "prompt": "lean, deep, non-redundant Sora prompt with bold continuous movement",
+      "motion": "free description of the scene's movement"
     },
     {
-      "beat": "return",
+      "beat": "scene-4",
       "title": "string",
-      "prompt": "lean, deep, non-redundant Sora prompt — opens at active peak, reversal and settling stay visibly alive, residue remains",
-      "motion": "Inherits active peak. Reversal begins. Overshoot, sway, or echo residue remains while the form resolves toward loop start."
+      "prompt": "lean, deep, non-redundant Sora prompt with bold continuous movement",
+      "motion": "free description of the scene's movement"
     }
   ]
 }`;
@@ -1065,11 +1035,11 @@ ${buildPresetInstructionBlock(stylePresets)}
 
 ═══ ENGINE RULES ═══
 - Generate abstract geometry only: no characters, no faces, no landscapes, no readable text, no logos.
-- Use one dominant central motif and one controlled event across the four scenes.
-- Keep the camera locked and the frame sparse with large negative space.
+- Use one dominant central motif and let its motion develop freely across the four scenes.
+- Keep the frame sparse with large negative space; camera movement is allowed when it serves the geometry.
 - Each scene prompt must be 45-75 words, lean, concrete, and render-ready for Sora.
 - Each clip may be 4, 8, or 12 seconds. Timing language must stretch cleanly across those durations.
-- The four scenes must form one connected loop: reveal, micro-shift, active hold, clean return.
+- The four scenes form one connected arc, but each scene chooses its own motion freely — no mandatory rest states, holds, or returns.
 - Do not drift into corporate motion graphics, over-detailed cyberpunk HUD, glossy 3D logo work, festival VJ clutter, or frantic glitch.
 
 ═══ OUTPUT FORMAT ═══
@@ -1078,13 +1048,13 @@ Return ONLY valid JSON. No markdown, no commentary.
   "storyTitle": "short title for this signal geometry loop",
   "storyConcept": "1-2 sentence summary of the abstract signal system",
   "subject": "the exact central geometric signal object",
-  "microMotion": "reveal -> shift -> hold -> resolve -> return",
+  "microMotion": "the overall motion arc across the four scenes",
   "negativePrompt": "comma-separated exclusions",
   "scenes": [
-    { "beat": "freeze", "title": "string", "prompt": "Sora prompt", "motion": "first-frame reveal and latent motion" },
-    { "beat": "onset", "title": "string", "prompt": "Sora prompt", "motion": "micro-shift and signal split" },
-    { "beat": "hold", "title": "string", "prompt": "Sora prompt", "motion": "active hold and locked alignment" },
-    { "beat": "return", "title": "string", "prompt": "Sora prompt", "motion": "collapse or return to clean loop start" }
+    { "beat": "scene-1", "title": "string", "prompt": "Sora prompt", "motion": "free description of the scene's movement" },
+    { "beat": "scene-2", "title": "string", "prompt": "Sora prompt", "motion": "free description of the scene's movement" },
+    { "beat": "scene-3", "title": "string", "prompt": "Sora prompt", "motion": "free description of the scene's movement" },
+    { "beat": "scene-4", "title": "string", "prompt": "Sora prompt", "motion": "free description of the scene's movement" }
   ]
 }`;
 
@@ -1100,24 +1070,6 @@ const extractJson = (raw: string): any => {
     throw new Error('Model response did not contain parseable JSON.');
   }
 };
-
-// ── Per-beat visual ground styles ─────────────────────────────────────────
-// Each beat renders through a distinct photographic / material signature.
-// These are RENDERING qualities layered on top of the concept — not subjects.
-
-const BEAT_STYLES = [
-  // 0 – freeze: near-rest but already alive
-  'rendered as a near-rest state with latent motion already visible in the first frame: subtle pressure, low drift, material tension, and a readable event quietly beginning inside the image',
-  // 1 – onset: directional expansion or contraction
-  'rendered as the first clear directional move: pressure traveling through the image, surfaces shifting, light or matter pulling with readable momentum across the frame',
-  // 2 – hold: peak state kept active
-  'rendered as an active peak state: sustained pulse, oscillation, internal churn, contour stress, or luminous residue that stays kinetically alive without becoming chaotic',
-  // 3 – return: residue and loop resolution
-  'rendered as a controlled return: afterimage residue, settling sway, elastic overshoot, or repeated micro-surges that resolve toward the opening pose',
-] as const;
-
-const STILLFRAME_BASE_SUFFIX =
-  'Raw ARV loop style only: locked static camera, one dominant geometric form, absurd object, or event, hard poster readability, lower third kept clean, no text, no logos, no mascot energy. Use tactile analog damage, scene-specific materials, controlled GIF-loop motion, brave but coherent color, and adult visual tension. Do not default to archive-witness, paper-cut, monolith, or stone-relic imagery unless the concept explicitly asks for it.';
 
 // ── Random scene (demo mode) ─────────────────────────────────────────────────
 
@@ -1199,28 +1151,26 @@ const buildRandomSceneSeed = (): RandomSceneSeed => ({
   motion: pickRandom(RANDOM_SCENE_MOTIONS),
 });
 
-const RANDOM_SCENE_SYSTEM_PROMPT = `You are a raw ARV text-to-video prompt writer for "Stillframe Rituals" — single locked-camera GIF-like loop clips made for AI video generation via Sora.
+const RANDOM_SCENE_SYSTEM_PROMPT = `You are a text-to-video prompt writer for "Stillframe Rituals" — GIF-like loop clips made for AI video generation via Sora.
 
 Write exactly ONE standalone scene prompt. Rules:
 - 45-75 words, lean, concrete, render-ready. No preamble, no quotes, no markdown, no list — output only the prompt sentence(s).
-- Locked static camera. One dominant subject and one dominant motion family.
-- Visible continuous movement from the first frame; loop-ready so the end can hand back to the start.
-- Abstract / geometric / material / underground. No readable text, no logos, no recognizable characters or faces, no strobe or harsh flashing.
-- Use tactile analog damage, scene-specific materials, brave coherent color, visible reset logic, and strong poster readability.`;
+- One dominant subject with bold, continuous, readable movement from the first frame; camera movement is allowed when it serves the scene.
+- Loop-ready so the end can hand back to the start.
+- No readable text, no logos, no strobe or harsh flashing.`;
 
 const buildRandomScenePromptRequest = (seed: RandomSceneSeed): string =>
   `Write one Sora text-to-video prompt for this seed.
 Subject: ${seed.subject}.
 Mood: ${seed.mood}.
 Color palette: ${seed.palette}.
-Dominant motion: ${seed.motion}.
-${STILLFRAME_BASE_SUFFIX}`;
+Dominant motion: ${seed.motion}.`;
 
 const buildFallbackScenePrompt = (seed: RandomSceneSeed): string =>
-  `Locked static camera on ${seed.subject}, lit in ${seed.palette}, carrying a mood of ${seed.mood}. ` +
+  `${seed.subject}, lit in ${seed.palette}, carrying a mood of ${seed.mood}. ` +
   `From the first frame the scene is already alive with ${seed.motion}, motion visible and continuous, ` +
   `loop-ready so the final frame resolves back toward the opening pose. ` +
-  `Tactile materials, coherent contrast, hard poster readability, no text, no logos, no characters, no strobe.`;
+  `No text, no logos, no strobe.`;
 
 // ── Routes ──────────────────────────────────────────────────────────────────
 
@@ -1271,10 +1221,9 @@ ${buildStillframeStyleLock(stylePresets, referenceStyle)}
 
 Rules:
 - Return ONLY valid JSON. No markdown, no commentary.
-- Generate fresh, surprising, copy-ready ARV ideas for themes, characters, events, actions, stories, styles, prompt seeds, and preset seeds.
+- Generate fresh, surprising, copy-ready ideas for themes, characters, events, actions, stories, styles, prompt seeds, and preset seeds.
 - Treat every run as a new variation request. Even with the same seed, avoid repeating earlier obvious combinations and push toward a distinct new constellation.
-- Everything must stay inside an open ARV family: hard readability, sparse composition, tactile material logic, one dominant subject or event, no mascot drift, and no glossy entertainment wallpaper.
-- Avoid generic fantasy, cheerful whimsy, generic cyberpunk, cute horror, and vague cinematic wallpaper.
+- The style spectrum is open: any world, palette, material logic, mood, or genre is valid as long as the idea is specific and renderable.
 - Make each item specific enough to paste directly into story, prompt, or preset workflows.
 - Prompt seeds must already sound usable for Stillframe GIF generation.
 - Preset seeds must describe a clear visual direction in one compact line.
@@ -1282,7 +1231,7 @@ Rules:
               ? 'For satire mode, ideas must obey Subject / Surface / Motion / Transformation / Loop logic and derive wit from visual contradiction, damaged print iconography, and mechanical residue instead of explanatory politics.'
               : mode === 'signal'
                 ? 'For signal geometry mode, ideas must be abstract black-background CRT geometry: motifs, line systems, dots, bars, orbital frames, chromatic edge split, one micro-motion event, no characters, no faces, no landscapes, no readable text.'
-              : 'For ritual mode, ideas must imply a loop-ready four-beat motion arc, one dominant subject or event, material continuity, and a physically legible story world.'}
+              : 'For ritual mode, ideas should imply a connected four-scene arc with bold, readable movement and a physically legible story world.'}
 - Return exactly this JSON shape:
 {
   "themes": ["..."],
@@ -1489,7 +1438,7 @@ Rules:
         referenceStyle,
         referenceImageCount: referenceImages.length,
         scenes: data.scenes.slice(0, 4).map((s: any, i: number) => ({
-          beat: s.beat ?? ['freeze', 'onset', 'hold', 'return'][i],
+          beat: ['scene-1', 'scene-2', 'scene-3', 'scene-4'][i],
           title: s.title ?? `Beat ${i + 1}`,
           prompt: s.prompt ?? '',
           motion: s.motion ?? '',
@@ -1600,7 +1549,7 @@ Rules:
         microMotion: data.microMotion ?? motionEvent,
         negativePrompt: data.negativePrompt ?? arvMinimalSignalGeometryPreset.negativePrompt,
         scenes: data.scenes.slice(0, 4).map((scene: any, index: number) => ({
-          beat: scene.beat ?? ['freeze', 'onset', 'hold', 'return'][index],
+          beat: ['scene-1', 'scene-2', 'scene-3', 'scene-4'][index],
           title: scene.title ?? `Signal Beat ${index + 1}`,
           prompt: scene.prompt ?? '',
           motion: scene.motion ?? '',
@@ -1802,7 +1751,7 @@ Rules:
         microMotion: data.microMotion ?? sketch.conclusion,
         negativePrompt: data.negativePrompt ?? '',
         scenes: data.scenes.slice(0, 4).map((scene: any, index: number) => ({
-          beat: scene.beat ?? ['freeze', 'onset', 'hold', 'return'][index],
+          beat: ['scene-1', 'scene-2', 'scene-3', 'scene-4'][index],
           title: scene.title ?? `Satire Beat ${index + 1}`,
           prompt: scene.prompt ?? '',
           motion: scene.motion ?? '',
@@ -1848,7 +1797,7 @@ Rules:
         ? 'For satire mode, compress the scene into one iconic image plate: one subject, one surface logic, one mechanical motion, one visual transformation, one residue return.'
         : mode === 'signal'
           ? 'For signal geometry mode, preserve abstract black-background CRT geometry: one central motif, thin linework, one micro-motion event, large negative space, and a clean lock or collapse.'
-        : 'For ritual story mode, preserve physical handoff logic and make the scene feel like one section of a continuous four-beat loop.';
+        : 'For ritual story mode, keep the scene connected to its neighbors, but let its movement develop freely.';
       const modePolishRuleB = mode === 'satire'
         ? 'For satire mode, favor damaged print iconography, hard poster-readability, analog contradiction, and visual compression over narrative explanation.'
         : mode === 'signal'
@@ -1875,9 +1824,9 @@ Rules:
 ${buildStillframeStyleLock(stylePresets, referenceStyle)}
 
 Rules:
-- Preserve the exact scene identity, beat intent, and loop logic of the source prompt.
+- Preserve the exact scene identity and loop logic of the source prompt.
 - Make the prompt leaner, sharper, more materially precise, and more renderable.
-- Keep the locked-camera ARV look with one dominant subject or event and readable continuous motion.
+- Keep one readable dominant subject or event with bold continuous motion; camera movement is allowed.
 - Prefer exact physical detail over mood adjectives.
 - Stay in 45-85 words.
 - ${modePolishRuleA}
@@ -1958,7 +1907,7 @@ Rules:
           ? Math.max(0, Math.min(3, Number(req.body.beatIndex)))
           : undefined;
 
-      const { promptCore, finalPrompt, beatStyle, iqBrief } = await buildStillframeRenderPrompt(
+      const { promptCore, finalPrompt, iqBrief } = await buildStillframeRenderPrompt(
         userPrompt,
         stylePresets,
         referenceStyle,
@@ -1987,13 +1936,11 @@ Rules:
         imageData: result.imageData,
         model: result.model,
         beatIndex,
-        beatStyle,
         debug: {
           target: 'sketch',
           rawPrompt: userPrompt,
           cleanedPrompt: promptCore,
           finalPrompt,
-          beatStyle,
           iqBrief: normalizeIQBriefForDebug(iqBrief),
           stylePresetIds: stylePresets.map((preset) => preset.id),
           referenceStyleSummary: referenceStyle?.summary ?? null,
@@ -2034,7 +1981,7 @@ Rules:
       const deployment =
         (process.env.AZURE_OPENAI_VIDEO_DEPLOYMENT || process.env.AZURE_VIDEO_MODEL || 'sora-2').trim();
 
-      const { promptCore, finalPrompt, beatStyle, iqBrief } = await buildStillframeRenderPrompt(
+      const { promptCore, finalPrompt, iqBrief } = await buildStillframeRenderPrompt(
         userPrompt,
         stylePresets,
         referenceStyle,
@@ -2051,7 +1998,6 @@ Rules:
         rawPrompt: userPrompt,
         cleanedPrompt: promptCore,
         finalPrompt,
-        beatStyle,
         renderMode: videoTransform ?? 'create',
         sourceVideoId: remixVideoId ?? null,
         iqBrief: normalizeIQBriefForDebug(iqBrief),
@@ -2105,7 +2051,6 @@ Rules:
               videoUrl: job.videoUrl,
               seconds: requestedSeconds,
               beatIndex,
-              beatStyle,
               debug: {
                 ...debug,
                 resultVideoId: resolvedVideoId,
@@ -2123,7 +2068,6 @@ Rules:
               videoBase64,
               seconds: requestedSeconds,
               beatIndex,
-              beatStyle,
               debug: {
                 ...debug,
                 resultVideoId: resolvedVideoId,

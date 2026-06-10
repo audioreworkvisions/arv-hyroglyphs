@@ -99,7 +99,7 @@ export async function generateStorySequence(
       : (preset?.colorPalette ?? 'Matte black, mineral white, restrained signal color, and one deliberate accent'),
     motionGrammar: typeof data.motionGrammar === 'string' && data.motionGrammar.trim()
       ? data.motionGrammar.trim()
-      : (preset?.motionStyle ?? 'Locked or very slow camera, one clear transformation, readable motion continuity, and a loop-ready return.'),
+      : (preset?.motionStyle ?? 'Free, readable movement with clear continuity across scenes and a loop-friendly resolution.'),
     hookTitle: typeof data.hookTitle === 'string' && data.hookTitle.trim() ? data.hookTitle.trim() : data.title,
     negativePrompt: typeof data.negativePrompt === 'string' && data.negativePrompt.trim() ? data.negativePrompt.trim() : defaultNegativePrompt,
     settingDescription: data.settingDescription,

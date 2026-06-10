@@ -31,7 +31,7 @@ export const STYLE_TASTE_TARGET =
   'raw, tactile, legible, absurd, underground, rhythm-aware, loopable, high-contrast, and visually singular';
 
 export const STYLE_TASTE_SAFETY =
-  'no strobe lights, no rapidly blinking lights, no very fast rotating objects, no nervous motifs, movements, patterns, colors, shapes, or lights, and no hectic pacing';
+  'no strobe lights, no rapidly blinking lights, no harsh flashing';
 
 export const STYLE_TASTE_AVOID =
   'cute or playful mascots, smiling characters, big expressive eyes, soft pastel palettes, glossy toy-like 3D, clean corporate motion graphics, luxury sci-fi moodboards, stock cinematic realism, anime or childrens-book framing, literal mystical cosplay, decorative pseudo-sacred costume illustration, crowded narrative clutter, photoreal people, frantic glitch spam, and defaulting every scene back into paper-cut witnesses, archive relic theatre, monolith idols, stone-object folklore, or any single preset family when the prompt does not ask for it';
@@ -214,22 +214,11 @@ export function buildStyleTasteLock(options: {
   styleMode?: StyleFlexMode;
 } = {}): string {
   const styleMode = options.styleMode ?? DEFAULT_STYLE_FLEX_MODE;
-  const flex = getStyleFlexInstruction(styleMode);
   const sections = [
     `STYLE TASTE LOCK (${STYLE_TASTE_NAME}):
-- Identity: ${STYLE_TASTE_SUMMARY}
-- Mode: ${styleMode.toUpperCase()}
-- ${flex.headline}
-- ${flex.anchorRule}
-- Safety: ${STYLE_TASTE_SAFETY}
-- Target feel: ${STYLE_TASTE_TARGET}
-- Palette: ${STYLE_TASTE_PALETTE}
-- Motifs: ${STYLE_TASTE_MOTIFS}
-- Texture: ${STYLE_TASTE_TEXTURE}
-- Motion: ${STYLE_TASTE_MOTION}
-- Variation: ${flex.variationRule}
-- Preset handling: ${flex.presetRule}
-- Avoid: ${STYLE_TASTE_AVOID}`,
+- Style is open: let the concept choose its own world, palette, materials, mood, and motion language.
+- Camera and subject movement are free; motion may be bold, continuous, and expressive as long as it stays readable.
+- Safety: ${STYLE_TASTE_SAFETY}`,
   ];
 
   const presetSection = buildPresetInflection(options.preset, styleMode);

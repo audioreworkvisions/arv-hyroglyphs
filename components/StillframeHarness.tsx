@@ -32,7 +32,7 @@ import type { AzureUsageEntry } from '../hooks/useAzureUsage';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-type BeatType = 'freeze' | 'onset' | 'hold' | 'return';
+type BeatType = 'scene-1' | 'scene-2' | 'scene-3' | 'scene-4';
 type AssetStatus = 'idle' | 'loading' | 'converting' | 'done' | 'error';
 type GenerationMode = 'ritual' | 'satire' | 'signal';
 type VideoTransformMode = 'remix' | 'extend';
@@ -91,7 +91,6 @@ interface StillframeRenderPromptDebug {
   rawPrompt: string;
   cleanedPrompt: string;
   finalPrompt: string;
-  beatStyle?: string;
   renderMode?: VideoRenderMode;
   sourceVideoId?: string | null;
   resultVideoId?: string | null;
@@ -155,24 +154,24 @@ type StillframeIdeaListKey = 'themes' | 'characters' | 'events' | 'actions' | 's
 // ── Constants ────────────────────────────────────────────────────────────────
 
 const BEAT_LABELS: Record<BeatType, string> = {
-  freeze: '① Freeze',
-  onset: '② Onset',
-  hold: '③ Hold',
-  return: '④ Return',
+  'scene-1': '① Szene 1',
+  'scene-2': '② Szene 2',
+  'scene-3': '③ Szene 3',
+  'scene-4': '④ Szene 4',
 };
 
 const BEAT_COLORS: Record<BeatType, string> = {
-  freeze: 'bg-cobalt/20 text-[#7db4e8] border-[#3a6090]/50',
-  onset: 'bg-[#1a2e1a]/60 text-[#72d9a0] border-[#2a5a3a]/50',
-  hold: 'bg-[#2a1a00]/60 text-[#e8a94a] border-[#6a4010]/50',
-  return: 'bg-[#1a0e2a]/60 text-[#b08af0] border-[#4a2a80]/50',
+  'scene-1': 'bg-cobalt/20 text-[#7db4e8] border-[#3a6090]/50',
+  'scene-2': 'bg-[#1a2e1a]/60 text-[#72d9a0] border-[#2a5a3a]/50',
+  'scene-3': 'bg-[#2a1a00]/60 text-[#e8a94a] border-[#6a4010]/50',
+  'scene-4': 'bg-[#1a0e2a]/60 text-[#b08af0] border-[#4a2a80]/50',
 };
 
 const BEAT_RING: Record<BeatType, string> = {
-  freeze: 'border-[#3a6090]/40',
-  onset: 'border-[#2a5a3a]/40',
-  hold: 'border-[#6a4010]/40',
-  return: 'border-[#4a2a80]/40',
+  'scene-1': 'border-[#3a6090]/40',
+  'scene-2': 'border-[#2a5a3a]/40',
+  'scene-3': 'border-[#6a4010]/40',
+  'scene-4': 'border-[#4a2a80]/40',
 };
 
 const PLACEHOLDER_CONCEPTS = [
