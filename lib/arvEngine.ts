@@ -23,41 +23,41 @@ function pick<T>(arr: readonly T[]): T {
 // ─── GIF PROMPT BUILDING BLOCKS ─────────────────────────────────────────────────
 
 const GEOMETRY_SUBJECTS = [
-  'A paper-cut witness silhouette emerging inside a rust-amber projector shaft against black velvet darkness',
-  'A damaged signal plate with one cyan aperture slit and a crooked lower arc held in hard frontal shadow',
-  'A faded cream codex panel with one circular core and stone-relief side walls hovering over black paper grain',
-  'A shadow body mirrored across a cobalt-black relay chamber with one orbit diagram locked behind the shoulders',
-  'A relay mask cut from xeroxed paper with one central lens opening and duplicated cyan-magenta edges',
-  'A stone block monolith wrapped in projector dust and CRT bleed, suspended in institutional darkness',
-  'A concentric archive aperture with a white core and photocopy residue ringed around it',
-  'A black drawer shrine with one luminous evidence slot and a paper silhouette leaning into the beam',
-  'A torn op-art panel where one signal ring bites into a faded cream field',
-  'A mechanical witness head built from shadow planes, scanline residue, and one cobalt rim',
+  'A crooked acid-lime spiral trapped inside a red scan gate on black CRT paper',
+  'A dirty white circle sliced by magenta bars while cyan scanner light bends the shape sideways',
+  'A black rubber torus wobbling once inside an underground concrete room with flyer grain on the walls',
+  'A primitive rectangle stack misregistering cyan and hot magenta like a damaged club ident',
+  'A single absurd geometric machine made from dots, bars, and bent grids breathing in a black field',
+  'A wet concrete floor reflecting one hovering violet triangle that folds into itself',
+  'A torn rave flyer fragment where a spiral, a barcode, and a color block fight for alignment',
+  'A non-human silhouette reduced to one shoulder-like black shape and a scanner band',
+  'A floating pressure diagram of circles, rails, and ugly orange ticks snapping into a loop',
+  'A malformed signal object hovering between graffiti wall grain, CRT bleed, and photocopy dust',
 ] as const;
 
 const MOTION_DESCRIPTORS = [
-  'holding almost still before a single projector-flicker pulse leaves a ghost trace',
-  'settling through a slow shoulder shift and hard return to the opening silhouette',
-  'rotating by degrees like a seized mechanism until one precise afterimage splits free',
-  'breathing through matte light and one controlled concentric pressure wave',
-  'locking into a near-still poster pose before one clean residue event',
-  'looping like a damaged broadcast ident with one deliberate structural movement',
+  'slipping out of register once before a hard freeze snaps it back into frame one',
+  'wobbling like a bad photocopy until a cyan scanner band forces a clean reset',
+  'folding inward through one ugly-bright color mistake and returning to the opening geometry',
+  'breathing through one pressure pulse while duplicate edges collapse into a single shape',
+  'locking into a near-still poster pose before one sharp residue event burns out',
+  'looping like a damaged underground broadcast ident with one deliberate geometric mutation',
 ] as const;
 
 const COLOR_PALETTES = [
-  'black velvet, faded cream, cobalt shadow, and rust amber with cyan-magenta misregistration',
-  'obsidian black, carved-stone beige, oxidized gold, and restrained jade accents',
-  'deep charcoal, terracotta dust, projector amber, and cold cyan bleed',
-  'black paper, dusty cream, cobalt blue, and one muted turquoise relay light',
-  'charcoal shadow, faded ink, CRT cyan, and oxidized copper under hard contrast',
+  'matte black, dirty white, phosphor cyan, hot magenta, and warning red',
+  'wet concrete black, acid lime, sodium orange, and bruised violet under CRT bleed',
+  'deep charcoal, xerox gray, rotten green, and one ugly amber color block',
+  'black paper, cobalt shadow, cyan scanner light, and magenta photocopy edges',
+  'charcoal shadow, faded ink, CRT cyan, rust orange, and acid-lime ticks under hard contrast',
 ] as const;
 
 const ATMOSPHERE_DESCRIPTORS = [
-  'dark archive alcove, tactile and adult like a damaged underground ident',
-  'institutional shadow theatre with analog residue and restrained menace',
-  'quiet codex stage where one machine-symbolic witness replaces a character',
-  'matte broadcast plate suspended between xerox ritual and relay diagram',
-  'minimal cosmic chamber with hard contrast, dust, and no decorative softness',
+  'raw underground video loop, tactile and adult like a damaged club ident',
+  'black-room reality fragment with analog residue and absurd precision',
+  'quiet geometric stage where color and shape replace character and lore',
+  'matte broadcast plate suspended between xerox damage and rave flyer logic',
+  'minimal concrete void with hard contrast, dust, and no decorative softness',
 ] as const;
 
 const CAMERA_DESCRIPTORS = [
@@ -69,25 +69,25 @@ const CAMERA_DESCRIPTORS = [
 ] as const;
 
 const NARRATIVE_THEMES = [
-  'archive emergence',
-  'broadcast relic awakening',
-  'relay chamber breach',
-  'codex aperture ritual',
-  'lens-centered transformation',
-  'xerox afterimage',
-  'machine folklore stillness',
-  'projector residue loop',
+  'raw signal emergence',
+  'geometric loop mistake',
+  'underground reality breach',
+  'color block mutation',
+  'scanner-band transformation',
+  'xerox afterimage collapse',
+  'absurd machine stillness',
+  'rave flyer residue loop',
 ] as const;
 
 const PHASE_MODIFIERS: Record<ARVNarrativePhase, string> = {
   emergence:
-    'The subject emerges from darkness as a single centered icon locking into view.',
+    'The subject appears as one raw geometric loop object locking into view from black.',
   tension:
-    'Graphic pressure rises. Rings tighten, the core brightens, and the tableau becomes more insistent without becoming frantic.',
+    'Graphic pressure rises. Bars slip, color edges misregister, and the object becomes more insistent without becoming frantic.',
   expansion:
-    'The image escalates through one controlled symbolic release, orb movement, or mechanical reveal while staying centered and readable.',
+    'The image escalates through one controlled shape mutation, color mistake, or mechanical reveal while staying centered and readable.',
   collapse:
-    'The sequence reduces back to one icon, mask, aperture, or sun-orb arrangement ready to loop back.',
+    'The sequence snaps back to one loop object, residue mark, or hard freeze pose ready to repeat.',
 };
 
 // ─── GIF PROMPT GENERATOR ────────────────────────────────────────────────────────
@@ -122,7 +122,7 @@ export function generateGifPrompt(
     phaseNote,
     characterLayer,
     `Thematic core: ${theme}.`,
-    `Favor sparse iconic composition, damaged analog texture, and loop clarity. Use photocopy grain, paper-cut edges, shadow bodies, codex geometry, projector haze, and hard contrast only where they strengthen the scene. Keep the palette tight, the motion controlled, the lower third clean, and the image immediately readable. Avoid sterile realism, glossy polish, cheerful mascot energy, scattered tiny subjects, and fantasy-cartoon literalism.`,
+    `Favor sparse iconic composition, damaged analog texture, and loop clarity. Use photocopy grain, CRT bleed, scanner bands, rave flyer damage, crude geometry, ugly-bright color accidents, and hard contrast only where they strengthen the scene. Keep the palette tight, the motion controlled, the lower third clean, and the image immediately readable. Avoid sterile realism, glossy polish, cheerful mascot energy, scattered tiny subjects, stock cinematic realism, and fantasy-cartoon literalism.`,
   ]
     .filter(Boolean)
     .join(' '), { styleMode });
@@ -215,12 +215,12 @@ export function generateStorySequence(
   });
 
   const titleTemplates = [
-    `${concept} — ARV Transmission`,
-    `Das Protokoll von: ${concept}`,
-    `${concept}: Geometrische Sequenz`,
-    `Archiveintrag — ${concept}`,
-    `${concept} · Systemanalyse`,
-    `Übertragung: ${concept}`,
+    `${concept} — Raw ARV Loop`,
+    `Signalfehler: ${concept}`,
+    `${concept}: Geometrische Schleife`,
+    `Underground-Loop — ${concept}`,
+    `${concept} · Formfehler`,
+    `Rueckkopplung: ${concept}`,
   ];
 
   return {
@@ -407,7 +407,7 @@ export async function expandPromptWithAI(basePrompt: string, styleMode: StyleFle
     body: JSON.stringify({
       prompt: basePrompt,
       instructions:
-        `You are an ARV visual aesthetic guide. Expand this GIF visual prompt while keeping a loose family resemblance to the ARV archive style. Preserve graphic intention, analog texture, and uncanny loop logic, but use only the motifs, palette cues, and artifacts that help this specific scene. Do not force every signature ARV element into every prompt. ${flexibilityNote} Keep output under 180 words. Output only the expanded prompt text, no explanations.`,
+        `You are an ARV visual aesthetic guide. Expand this GIF visual prompt toward raw early-ARV loop language: abstract geometry, ugly-bright color slips, underground-reality fragments, analog texture, and uncanny reset logic. Preserve graphic intention and loop mechanics, but use only the motifs, palette cues, and artifacts that help this specific scene. Do not force every signature ARV element into every prompt. ${flexibilityNote} Keep output under 180 words. Output only the expanded prompt text, no explanations.`,
     }),
   });
   const data = await response.json();

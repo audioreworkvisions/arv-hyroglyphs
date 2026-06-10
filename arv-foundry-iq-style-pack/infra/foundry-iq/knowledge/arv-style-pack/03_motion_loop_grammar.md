@@ -11,7 +11,7 @@ darkness -> reveal -> micro movement -> artifact reaction -> controlled collapse
 
 ## Duration
 
-- 4 to 6 seconds.
+- 4, 8, or 12 seconds.
 - One dominant event only.
 - First and last frame must be loop-compatible.
 - End pose may be identical to first frame or hold a faint afterimage that can resolve cleanly.

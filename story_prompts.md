@@ -15,21 +15,22 @@ All outputs must follow the ARV aesthetic and satire rules.
 
 ARV_GIF_STYLE:
 
-- dark or deep-background-biased, matte, dreamlike, geometric, symbolic, techno-cultural, introspective
-- slow to moderate, smooth, controlled motion with room for organic drift and surreal transformation
+- raw early-ARV loop language: abstract geometric forms, underground reality fragments, damaged broadcast texture, rave flyer residue, and one clear reset event
+- dark or deep-background-biased, matte, geometric, symbolic when useful, techno-cultural, absurd, tactile, and visually singular
+- slow to moderate, controlled motion with visible GIF-loop mechanics: wobble, scanner sweep, color slip, duplicate collapse, snapback, or one surreal transformation
 - no strobo lights, no fast blinking lights, no very fast rotating objects, no nervous motifs, movements, patterns, colors, shapes, lights, no hectic chaos
-- geometry and motifs: lines, circles, rings, halos, portals, op-art waves, lotus forms, symbols, relic technology, floating portraits, crystal prisms, runic sigils, windows
-- structures: symmetry, overlap, orbital diagrams, paper-cut layering, sacred or pseudo-scientific geometry
-- color: velvet black, indigo, cobalt, cyan, seafoam, parchment, ember orange, muted CRT green; accents may glow softly but never flash aggressively
-- motion: breathing light, soft orbit, suspended poses, ceremonial unfolding, slow zooms, calm loops
-- visuals should feel hypnotic, pleasant, spacious, trippy, strange, and composed
+- geometry and motifs: crude spirals, rectangles, dots, barcode bars, scanner bands, off-register circles, pressure diagrams, torn flyer shapes, rubbery apertures, absurd signal objects, and ordinary objects behaving like signal organisms
+- structures: symmetry or deliberate off-symmetry, overlap, orbital diagrams, cheap CRT diagrams, concrete room fragments, damaged print layering, and pseudo-scientific geometry only when it sharpens the loop
+- color: matte black, dirty white, phosphor cyan, hot magenta, acid lime, warning red, sodium orange, bruised violet, cobalt shadow, rotten CRT green; accents may be ugly-bright but never flash aggressively
+- motion: scanner sweep, geometric inhale, color slip, duplicate collapse, wobble, hard freeze, pressure pulse, snapback, and visible return to frame one
+- visuals should feel hypnotic, raw, spacious, trippy, strange, underground, and composed
 
 ARV_DUAL_TRACK_ENGINE:
 
-- default track: objects, events, micro-worlds, material processes, machine rituals, artificial weather, speaker physics, archive machinery, fossil technology, cable forests, tape rivers, deep server reefs
-- alternate track when clearly requested: op-art prisms, cut-paper collage, lotus or mandala geometry, signal rings, cyber oracles, machine soul portals, glitch cathedrals, MR or community ritual worlds
+- default track: raw abstract loop forms, geometric mistakes, scanner accidents, color block collisions, underground room fragments, objects, events, micro-worlds, material processes, machine rituals, artificial weather, speaker physics, cable forests, tape rivers, deep server reefs
+- alternate track when clearly requested: op-art prisms, cut-paper collage, signal rings, portals, machine soul diagrams, glitch cathedrals, MR or community ritual worlds
 - do not default to eye, third eye, all-seeing-eye, lotus, mandala, oracle face, halo, or simple signal rings unless the prompt or preset clearly asks for that family (and always prefer crystal/runic alternatives over actual eye geometry)
-- prompt grammar should follow: motif + movement + camera + light + style + loop rule
+- prompt grammar should follow: dominant form + movement mistake + color/texture event + camera + style + loop reset
 - negative prompting should adapt by track:
 - material track may suppress eyes, lotus, mandala, floating faces, and random symbols
 - symbolic track should suppress readable text, logos, aggressive flashes, chaotic cuts, and all eye/face-based mystical motifs in favor of crystal prisms and runic sigils
@@ -62,10 +63,10 @@ GIF_STORY_ENGINE:
 - create multi-scene GIF story prompts
 - each scene must follow ARV geometry, tone, and motion rules
 - narrative phases:
-  1. Emergence — shapes appear slowly
-  2. Tension — subtle distortion, machine logic
-  3. Expansion — cosmic or bureaucratic interruption
-  4. Collapse — return to minimal form
+  1. Emergence — one raw form appears and becomes readable
+  2. Tension — scanner, color, or geometry slips out of register
+  3. Expansion — one absurd underground-reality mutation peaks
+  4. Collapse — snapback, residue, or afterimage returns to frame one
 
 GIF_SATIRE_SKETCH ENGINE:
 

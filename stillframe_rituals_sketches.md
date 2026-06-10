@@ -1,21 +1,21 @@
 Master Style Prompt
-Style: Stillframe Rituals / Micro-Motion Stop-Frame
+Style: Stillframe Rituals / Raw ARV Loop Forms
 
-Create a cinematic stop-motion inspired visual loop that feels like a living poster. The scene is mostly still, composed like a single iconic frame. Only one or two small elements move subtly: a hand twitching, a shadow sliding, dust floating, a paper symbol rotating slightly, a candle flame bending, a mechanical eye blinking once, a thin line pulsing, or a silhouette breathing.
+Create a raw GIF-like visual loop that feels like a damaged underground poster becoming briefly alive. The scene is composed like one iconic frame, but the subject should now be a geometric form, absurd object, signal shape, scanner band, color block, or non-human silhouette rather than a default archive figure. One controlled event moves: a scanner sweep, color slip, duplicate collapse, spiral inhale, barcode shift, rubbery aperture snap, pressure pulse, or hard reset.
 
-Motion must be minimal, deliberate, and rhythmic. The animation should move, pause, hold still, then move again. Use slow micro-movements, subtle jitter, imperfect handmade stop-frame timing, and tactile frame-by-frame texture. The loop should feel hypnotic, sparse, mysterious, and suitable for dark techno livestream visuals.
+Motion must be deliberate, rhythmic, and visibly loopable. The animation should move, make one strange mistake, pause, hold, then snap or settle back to the opening pose. Use subtle jitter, scanner logic, imperfect handmade timing, and tactile frame-by-frame texture. The loop should feel hypnotic, sparse, mysterious, absurd, and suitable for dark techno livestream visuals.
 
-Visual language: paper cut-outs, rough silhouettes, old projector light, cardboard theatre, analog archive, occult diagrams, moon maps, strange symbols, dust, scratched film, soft grain, scanlines, shadow play, faded ink, graphite, old paper, black velvet background, cyan halo, rust amber highlights, faded cream shapes, cobalt blue shadows.
+Visual language: crude geometry, spirals, rectangles, dots, bars, scanner bands, torn rave flyer shapes, black CRT fields, underground concrete, analog broadcast dirt, photocopy residue, toner dust, scratched film, scanlines, spray haze, dirty white, phosphor cyan, hot magenta, acid lime, warning red, sodium orange, cobalt shadow.
 
 Composition: locked camera, central subject, strong first-frame readability, negative space, lower third mostly clean for OBS overlays, one dominant visual idea, no clutter. The image should work as a thumbnail and as a looping GIF.
 
-Animation behavior: 4 to 6 seconds, seamless loop, one micro-event only, slow start, tiny motion, short pause, tiny return motion, hold. Avoid continuous busy movement. The stillness is the main effect.
+Animation behavior: 4, 8, or 12 seconds, seamless loop, one dominant event only, readable start, controlled motion, short hard hold, visible return or snapback. Avoid continuous busy movement. The loop mechanics are the main effect.
 
-Atmosphere: quiet cosmic report, dusty room above human certainty, ancient-futurist ritual, obsolete machine dreaming, mysterious broadcast from a hidden archive.
+Atmosphere: raw underground broadcast, damaged club ident, absurd signal reality, obsolete machine dreaming, mysterious transmission from a concrete room below the archive.
 
-Negative prompt: no text, no logos, no subtitles, no watermark, no fast camera movement, no aggressive flashing, no chaotic particle storms, no glossy stock-video realism, no over-clean 3D, no crowded composition, no dancing characters, no full-body action, no busy sci-fi HUD, no modern corporate design.
+Negative prompt: no text, no logos, no subtitles, no watermark, no fast camera movement, no aggressive flashing, no chaotic particle storms, no glossy stock-video realism, no luxury sci-fi wallpaper, no over-clean 3D, no crowded composition, no dancing characters, no full-body action, no busy sci-fi HUD, no modern corporate design, no default paper-cut witness unless explicitly requested.
 Kurzversion für dein Style-Feld
-Stillframe Rituals: a cinematic micro-motion stop-frame style for hypnotic techno visuals. Mostly still living-poster composition, locked camera, dark analog archive mood, paper cut-outs, silhouettes, projector light, dust, scratched film, occult diagrams, moon maps, old paper, black velvet, cyan halo, rust amber, cobalt shadows. Only one tiny movement happens: blink, breath, shadow shift, symbol twitch, candle flicker, hand movement, line pulse. Move → pause → hold → tiny return → seamless loop. 4–6 seconds, sparse, iconic, lower third clean for OBS, no text, no logos, no fast movement, no clutter.
+Stillframe Rituals: raw ARV loop forms for hypnotic techno visuals. Locked camera, living-poster composition, abstract geometric subject or absurd signal object, dark CRT / concrete / flyer / scanner mood, photocopy dirt, toner dust, scanlines, hot magenta, cyan, acid lime, warning red, dirty white. One event: scanner sweep, color slip, duplicate collapse, spiral inhale, barcode shift, aperture snap, pressure pulse. Move -> mistake -> hold -> snapback -> seamless loop. 4/8/12 seconds, sparse, iconic, lower third clean for OBS, no text, no logos, no fast movement, no clutter.
 Storyboard-Regeln für den Generator
 Each generated storyboard must contain exactly one dominant subject and one micro-motion event.
 

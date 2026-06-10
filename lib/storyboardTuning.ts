@@ -32,9 +32,9 @@ const STORY_SCENE_BEAT_LABELS: Record<StorySceneBeat, { en: string; de: string }
 
 const STORY_ENGINE_MASTER_ADDITIONS: Record<StoryArcMode, string> = {
   cinematic:
-    'seamless looping GIF-style video, 4 to 6 seconds, one dominant subject or event, cinematic but restrained motion, locked or very slow deliberate camera, sparse lower third kept clean for OBS overlays, tactile material response, a scene-led palette, strong first-frame readability, a clear loop-ready return or afterimage, no strobe lights, no rapid blinking, no hectic pacing',
+    'seamless looping GIF-style video, 4, 8, or 12 seconds, one dominant form or event, raw underground video-art logic, locked or very slow camera, tactile analog damage, scene-led color collision, strong first-frame readability, visible return to frame one or hard afterimage, no strobe lights, no rapid blinking, no hectic pacing',
   iconic:
-    'seamless looping GIF-style video, 4 to 6 seconds, one large dominant icon, structure, or event, frontal or strongly organized composition, controlled hypnotic motion with one clear payoff, locked or very slow deliberate camera, sparse lower third kept clean for OBS overlays, coherent material logic, strong contrast, strong first-frame readability, and a loop-ready end pose or afterimage, no strobe lights, no rapid blinking, no hectic pacing',
+    'seamless looping GIF-style video, 4, 8, or 12 seconds, one large dominant geometric icon, absurd object, structure, or signal event, frontal or strongly organized composition, controlled hypnotic motion with one clear payoff, locked camera, sparse lower third kept clean for OBS overlays, analog texture, strong contrast, strong first-frame readability, and a loop-ready snapback pose or afterimage, no strobe lights, no rapid blinking, no hectic pacing',
 };
 
 export function getStoryEngineMasterAddition(arcMode: StoryArcMode = 'iconic'): string {
@@ -65,10 +65,10 @@ export function getStorySceneBeatLabel(
 }
 
 export const STORY_ENGINE_MATERIAL_NEGATIVE_PROMPT =
-  'avoid cute or playful mascots, smiling faces, big expressive eyes, pastel or candy colors, glossy toy-like 3D, anime or fantasy-cartoon styling, decorative pseudo-sacred costume aesthetics, readable text, fake inscriptions, logos, watermarks, gore, conquest imagery, aggressive flashing, and hectic motion';
+  'avoid cute or playful mascots, smiling faces, big expressive eyes, pastel or candy colors, glossy toy-like 3D, luxury abstract wallpaper, stock cinematic realism, anime or fantasy-cartoon styling, decorative pseudo-sacred costume aesthetics, readable text, fake inscriptions, logos, watermarks, gore, conquest imagery, aggressive flashing, and hectic motion';
 
 export const STORY_ENGINE_SYMBOLIC_NEGATIVE_PROMPT =
-  'avoid cute or playful mascots, smiling faces, big expressive eyes, pastel or candy colors, glossy toy-like 3D, anime or fantasy-cartoon styling, literal mythology illustration, decorative pseudo-sacred imagery, readable text, fake inscriptions, logos, watermarks, gore, stereotypes, aggressive flashing, and hectic motion';
+  'avoid cute or playful mascots, smiling faces, big expressive eyes, pastel or candy colors, glossy toy-like 3D, luxury abstract wallpaper, stock cinematic realism, anime or fantasy-cartoon styling, literal mythology illustration, decorative pseudo-sacred imagery, readable text, fake inscriptions, logos, watermarks, gore, stereotypes, aggressive flashing, and hectic motion';
 
 export const STORY_ENGINE_GRAFFITI_NEGATIVE_PROMPT =
   'avoid photoreal humans, dense graffiti lettering, gang-sign cliches, corporate mascot polish, glossy 3D toy rendering, realistic streetwear fashion shoots, logos, watermarks, gore, aggressive flashing, and frantic motion';
@@ -76,6 +76,8 @@ export const STORY_ENGINE_GRAFFITI_NEGATIVE_PROMPT =
 export type StoryPromptMode = 'material' | 'symbolic' | 'graffiti';
 
 const SYMBOLIC_PROMPT_PATTERN = /\b(op-art|op art|oracle|halo|signal ring|signal rings|mask|mandala|totem|diagram|emblem|portal|aperture|sigil|symbolic|iconic|afterimage|silhouette)\b/i;
+
+const RAW_ABSTRACT_PROMPT_PATTERN = /\b(loop|loops|gif|geometry|geometric|abstract|spiral|shape|barcode|scanner|scanline|crt|flyer|underground|absurd|color block|colour block|forms|formen|schleife|geometrisch|abstrakt)\b/i;
 
 const GRAFFITI_PROMPT_PATTERN = /\b(graffiti|graffitti|mural|street art|spray paint|spray-painted|aerosol|boardwalk|seaside|surf|flamingo|floatie|raft|bottle|beach dog|cartoon creature|lowbrow)\b/i;
 
@@ -108,25 +110,25 @@ const STORY_ENGINE_AVOID_OLD_DEFAULTS_DE =
 
 const STORY_ENGINE_REFERENCE_STYLE_EN = [
   'REFERENCE STYLE BIAS (HIGH PRIORITY):',
-  '- Favor one dominant subject or event over wide environments or many actors.',
-  '- Build scenes as bold readable compositions with negative space, a clear anchor, and enough restraint to loop cleanly.',
-  '- Let the concept decide the world type: architectural, atmospheric, industrial, ecological, microscopic, abstract, or signal-driven are all valid.',
-  '- Surfaces should feel tactile and specific: dust, glass, fog, metal, sediment, scanline residue, lacquer cracks, fabric, fluid, or grain rather than generic glossy CGI.',
-  '- Keep the palette coherent and selective, but let it shift with the concept instead of forcing the same old archive colors every time.',
-  '- Use only the motifs that sharpen the scene; do not inject archive drawers, witness figures, codex panels, or stone relics by reflex.',
-  '- Motion should stay controlled and legible: one decisive shift, reaction, pulse, fold, drift, or transformation plus a clean return.',
+  '- Favor one dominant geometric form, absurd object, or signal event over wide environments or many actors.',
+  '- Build scenes as bold readable GIF-loop compositions with negative space, a clear anchor, and an obvious reset path.',
+  '- Let the concept decide the world type: abstract geometry, damaged flyer logic, underground room fragment, industrial scrap, synthetic organism, or signal-driven object are all valid.',
+  '- Surfaces should feel tactile and specific: toner dust, CRT bleed, scanlines, wet concrete, dirty glass, flyer paper, spray haze, lacquer cracks, fluid, or grain rather than generic glossy CGI.',
+  '- Keep the palette coherent but brave: allow one ugly-bright color collision instead of forcing the same old archive colors every time.',
+  '- Use only the motifs that sharpen the scene; do not inject archive drawers, witness figures, codex panels, monoliths, or stone relics by reflex.',
+  '- Motion should stay controlled and legible: one decisive wobble, scanner sweep, color slip, pulse, fold, drift, duplicate collapse, or transformation plus a clean return.',
   '- Keep the lower third clean for overlays. Avoid clutter, crowds, naturalistic acting, photoreal humans, and decorative narrative padding.',
 ].join('\n');
 
 const STORY_ENGINE_REFERENCE_STYLE_DE = [
   'REFERENZ-STILBIAS (HOHE PRIORITAET):',
-  '- Bevorzuge ein dominantes Motiv oder Ereignis statt weiter Welten oder vieler Akteure.',
-  '- Baue Szenen als starke lesbare Kompositionen mit negativem Raum, klarem Anker und genug Ruhe fuer einen sauberen Loop.',
-  '- Lass das Konzept entscheiden, ob die Welt architektonisch, atmosphaerisch, industriell, oekologisch, mikroskopisch, abstrakt oder signalhaft wird.',
-  '- Oberflaechen sollen taktil und konkret wirken: Staub, Glas, Nebel, Metall, Sediment, Scanline-Reste, Lackrisse, Stoff, Fluessigkeit oder Koernung statt generischem glossy CGI.',
-  '- Halte die Palette kohaerent und selektiv, aber zwinge ihr nicht jedes Mal dieselben alten Archivfarben auf.',
-  '- Nutze nur die Motive, die das Bild schaerfen; injiziere nicht reflexhaft Archivschubladen, Witness-Figuren, Codex-Panels oder Steinreliquien.',
-  '- Bewegung bleibt kontrolliert und lesbar: eine praegnante Verschiebung, Reaktion, Welle, Faltung, Drift oder Transformation plus saubere Rueckkehr.',
+  '- Bevorzuge eine dominante geometrische Form, ein absurdes Objekt oder ein Signalereignis statt weiter Welten oder vieler Akteure.',
+  '- Baue Szenen als starke lesbare GIF-Loop-Kompositionen mit negativem Raum, klarem Anker und sichtbarem Reset-Pfad.',
+  '- Lass das Konzept entscheiden, ob die Welt abstrakte Geometrie, beschaedigte Flyer-Logik, Underground-Raumfragment, industrieller Rest, synthetischer Organismus oder signalhaftes Objekt wird.',
+  '- Oberflaechen sollen taktil und konkret wirken: Tonerstaub, CRT-Bleed, Scanlines, nasser Beton, schmutziges Glas, Flyerpapier, Spray-Haze, Lackrisse, Fluessigkeit oder Koernung statt generischem glossy CGI.',
+  '- Halte die Palette kohaerent, aber mutig: erlaube eine ugly-bright Farbkollision statt jedes Mal dieselben alten Archivfarben zu erzwingen.',
+  '- Nutze nur die Motive, die das Bild schaerfen; injiziere nicht reflexhaft Archivschubladen, Witness-Figuren, Codex-Panels, Monolithen oder Steinreliquien.',
+  '- Bewegung bleibt kontrolliert und lesbar: ein praegnantes Wobble, Scanner-Sweep, Color-Slip, Puls, Faltung, Drift, Duplikat-Kollaps oder Transformation plus saubere Rueckkehr.',
   '- Halte das untere Drittel frei fuer Overlays. Vermeide Unruhe, Menschenmengen, naturalistisches Schauspiel, photoreale Menschen und dekorativen Erzaehlkitsch.',
 ].join('\n');
 
@@ -175,21 +177,23 @@ const STORY_ENGINE_REFERENCE_STYLE_GRAFFITI_DE = [
 ].join('\n');
 
 const STORY_ENGINE_DUAL_TRACK_EN = [
-  'ARV has two valid visual tracks.',
-  '- Default track: material-process worlds, object rituals, machine ecologies, weather systems, kinetic architectures, micro-worlds, and non-human data life.',
-  '- Alternate track: abstract or signal-driven worlds when the user prompt or preset clearly asks for them, including icons, diagrams, portals, pressure geometry, disciplined pattern systems, and graphic forms.',
+  'ARV has three valid visual tracks.',
+  '- Default track now: raw abstract loop forms, signal diagrams, scanner accidents, color-field collisions, and absurd underground-reality objects.',
+  '- Material track: object rituals, machine ecologies, weather systems, kinetic architectures, micro-worlds, and non-human data life.',
+  '- Symbolic track: abstract or signal-driven worlds, including icons, diagrams, portals, pressure geometry, disciplined pattern systems, and graphic forms.',
   `- ${STORY_ENGINE_AVOID_OLD_DEFAULTS_EN}`,
-  '- If the current request clearly leans symbolic, allow abstract iconography intentionally without dragging the result back into the old archive canon.',
-  '- Prompt grammar should internally favor: motif + movement + camera + light + style + loop rule.',
+  '- Presets provide raw ingredients, not a locked recipe. A strong idea may contradict a preset as long as the output stays ARV-readable.',
+  '- Prompt grammar should internally favor: dominant form + movement mistake + color/texture event + camera + loop reset.',
 ].join('\n');
 
 const STORY_ENGINE_DUAL_TRACK_DE = [
-  'ARV hat zwei gueltige visuelle Spuren.',
-  '- Standardspur: Material- und Prozesswelten, Objekt-Rituale, Maschinenoekologien, Wettersysteme, kinetische Architekturen, Mikro-Welten und nicht-menschliches Datenleben.',
-  '- Alternative Spur: abstrakte oder signalhafte Welten, wenn Prompt oder Preset sie klar verlangen, inklusive Icons, Diagrammen, Portalen, Druckgeometrien, disziplinierten Mustersystemen und grafischen Formen.',
+  'ARV hat drei gueltige visuelle Spuren.',
+  '- Neuer Default: rohe abstrakte Loop-Formen, Signaldiagramme, Scanner-Unfaelle, Farbfeld-Kollisionen und absurde Underground-Reality-Objekte.',
+  '- Materialspur: Objekt-Rituale, Maschinenoekologien, Wettersysteme, kinetische Architekturen, Mikro-Welten und nicht-menschliches Datenleben.',
+  '- Symbolische Spur: abstrakte oder signalhafte Welten, inklusive Icons, Diagrammen, Portalen, Druckgeometrien, disziplinierten Mustersystemen und grafischen Formen.',
   `- ${STORY_ENGINE_AVOID_OLD_DEFAULTS_DE}`,
-  '- Wenn die aktuelle Anfrage klar symbolisch ist, erlaube abstrakte Ikonografie bewusst, ohne die Szene wieder in den alten Archiv-Kanon zu ziehen.',
-  '- Die gifSpecification soll intern moeglichst diesem Aufbau folgen: Motiv + Bewegung + Kamera + Licht + Stil + Loop-Regel.',
+  '- Presets liefern Rohmaterial, keine feste Bauanleitung. Eine starke Idee darf einem Preset widersprechen, solange das Ergebnis ARV-lesbar bleibt.',
+  '- Die gifSpecification soll intern moeglichst diesem Aufbau folgen: dominante Form + Bewegungsfehler + Farb/Textur-Ereignis + Kamera + Loop-Reset.',
 ].join('\n');
 
 const STORY_ENGINE_DUAL_TRACK_SYMBOLIC_EN = [
@@ -230,17 +234,18 @@ const STORY_ENGINE_DUAL_TRACK_GRAFFITI_DE = [
 
 const STORY_ENGINE_DIRECTION_EN = [
   'STORY ENGINE DIRECTION:',
-  '- Treat every result as a recognizable ARV universe with repeatable rules, not a generic one-off aesthetic loop.',
-  '- Default to bold readable anchors before expanding into wider environments or extra lore.',
-  '- The result should feel adult, tactile, visually precise, and slightly uncanny, not cute, glossy, or randomly decorative.',
+  '- Treat every result as a recognizable ARV loop universe with repeatable visual rules, not a generic one-off aesthetic loop.',
+  '- Default to bold readable forms, color events, and reset mechanics before adding environments or lore.',
+  '- The result should feel adult, tactile, raw, visually precise, absurdly specific, and slightly uncanny, not cute, glossy, cinematic-stock, or randomly decorative.',
   `- ${STORY_ENGINE_AVOID_OLD_DEFAULTS_EN}`,
   '- Prioritize motif families such as:',
+  '  - raw geometry, scanner bars, spirals, dots, rectangles, barcode pressure, and off-register color fields',
   '  - material reactions, pressure systems, weather engines, fluid behavior, particles, and kinetic surfaces',
   '  - machine ecologies, laboratories, cable growth, industrial oceans, micro-cities, and controlled transport systems',
   '  - abstract signal systems, diagrams, apertures, cores, light events, and disciplined geometric fields',
   '  - non-human entities, silhouettes, objects, or structures treated as graphic anchors rather than default witness icons',
   '- Strong narrative archetypes to emulate when relevant:',
-  '  - a system wakes, reveals its rule set, peaks in one memorable event, and resolves to a loop-facing residue',
+  '  - a signal form appears, commits one visual mistake, peaks in one memorable event, and resets with residue',
   '  - a small anomaly spreads through a contained world, reorders it, and then snaps back just enough to repeat',
   '  - a structure opens, pressure moves through it, one transformation lands, and the world returns altered but loopable',
   '  - a material surface changes state, exposes a hidden layer, and settles into a new equilibrium',
@@ -252,17 +257,18 @@ const STORY_ENGINE_DIRECTION_EN = [
 
 const STORY_ENGINE_DIRECTION_DE = [
   'RICHTUNG DER STORY-ENGINE:',
-  '- Behandle jedes Ergebnis als wiedererkennbare ARV-Serienwelt mit eigener Logik statt als generischen One-Off-Loop.',
-  '- Default ist ein stark lesbarer Bildanker, bevor du in breitere Umgebungen oder Zusatzlore gehst.',
-  '- Das Ergebnis soll erwachsen, taktil, visuell praezise und leicht unheimlich wirken, nicht cute, glossy oder beliebig dekorativ.',
+  '- Behandle jedes Ergebnis als wiedererkennbare ARV-Loop-Welt mit eigenen visuellen Regeln statt als generischen One-Off-Loop.',
+  '- Default sind stark lesbare Formen, Farbereignisse und Reset-Mechaniken, bevor du in breitere Umgebungen oder Zusatzlore gehst.',
+  '- Das Ergebnis soll erwachsen, taktil, roh, visuell praezise, absurd spezifisch und leicht unheimlich wirken, nicht cute, glossy, stock-cinematic oder beliebig dekorativ.',
   `- ${STORY_ENGINE_AVOID_OLD_DEFAULTS_DE}`,
   '- Bevorzugte Motivfamilien sind zum Beispiel:',
+  '  - rohe Geometrie, Scanner-Bars, Spiralen, Punkte, Rechtecke, Barcode-Druck und off-register Farbfelder',
   '  - Materialreaktionen, Drucksysteme, Wettermaschinen, Fluide, Partikel und kinetische Oberflaechen',
   '  - Maschinenoekologien, Labore, Kabelwachstum, industrielle Ozeane, Mikro-Welten und kontrollierte Passage-Systeme',
   '  - abstrakte Signalsysteme, Diagramme, Aperturen, Kerne, Lichtereignisse und disziplinierte Geometriefelder',
   '  - nicht-menschliche Entitaeten, Silhouetten, Objekte oder Strukturen als grafische Bildanker statt defaultiger Witness-Ikonen',
   '- Starke Story-Archetypen, wenn passend:',
-  '  - ein System erwacht, zeigt seine Regel, erreicht ein praegendes Ereignis und endet in einem loopfaehigen Restbild',
+  '  - eine Signalform erscheint, begeht einen visuellen Fehler, erreicht ein praegendes Ereignis und resetet mit Restbild',
   '  - eine kleine Anomalie greift in eine geschlossene Welt ein, ordnet sie neu und schnellt gerade genug zur Wiederholung zurueck',
   '  - eine Struktur oeffnet sich, Druck wandert hindurch, eine Transformation landet und die Welt kehrt veraendert aber loopbar zurueck',
   '  - eine Materialoberflaeche wechselt den Zustand, legt eine verborgene Schicht frei und stabilisiert sich in neuem Gleichgewicht',
@@ -452,7 +458,7 @@ ${colorRuleLine}
 ${obsRuleLine}
 ${creativeDirectionLine}
 
-Use this preset as the primary mood anchor, not a rigid cage. Let scenes escalate, mutate materials, reveal fresh details, and take an elegant left turn or two as long as the sequence stays cohesive, readable, cinematic, and rewatchable. ${arcMode === 'iconic' ? 'Bias toward poster-like ident moments with one dominant subject, one memorable motion payoff, and an end pose that feels instantly replayable.' : 'Bias toward connected cinematic progression with clearer environmental continuity, atmosphere-led transitions, and loop-capable scene endings.'}
+Use this preset as ignition material, not a rigid cage. Extract its strongest color, texture, motion, or compositional pressure, then let scenes mutate into fresh raw ARV loop images. ${arcMode === 'iconic' ? 'Bias toward poster-like GIF ident moments with one dominant abstract subject, one memorable motion payoff, and an end pose that feels instantly replayable.' : 'Bias toward connected loop progression with clearer physical handoff, tactile transitions, and loop-capable scene endings.'}
 Mandatory safety guardrails: no strobe lights, no rapidly blinking lights, no very fast rotating objects, no nervous motifs, patterns, colors, shapes, or lights, and no hectic pacing.`;
 }
 
@@ -490,7 +496,7 @@ export function detectStoryPromptMode(
     return 'graffiti';
   }
 
-  return SYMBOLIC_PROMPT_PATTERN.test(haystack) ? 'symbolic' : 'material';
+  return SYMBOLIC_PROMPT_PATTERN.test(haystack) || RAW_ABSTRACT_PROMPT_PATTERN.test(haystack) ? 'symbolic' : 'material';
 }
 
 function getNegativePromptForMode(mode: StoryPromptMode): string {
@@ -575,8 +581,8 @@ export function buildStoryEngineSystemInstruction(
   const presetBlock = preset && preset.id !== 'neutral'
     ? buildPresetStoryboardInstruction(preset, arcMode)
     : language === 'de'
-      ? 'Wenn kein Preset gewaehlt ist, halte den Look kohaerent, aber offen fuer mutigere Wendungen, taktile Reaktionen, seltsame Details und szenenspezifische Eskalation. Bevorzuge pro Szene ein dominantes Motiv, einen klaren Bewegungs-Payoff und ein loopfaehiges Endbild.'
-      : 'If no preset is selected, keep the look cohesive but open to bolder turns, tactile reactions, odd details, and scene-specific escalation. Favor one dominant motif per scene, one clear motion payoff, and a loop-ready end image.';
+      ? 'Wenn kein Preset gewaehlt ist, halte den Look kohaerent, aber offen fuer rohe Loop-Wendungen, abstrakte Geometrie, ugly-bright Farbspruenge, taktile Reaktionen, seltsame Details und szenenspezifische Eskalation. Bevorzuge pro Szene ein dominantes Motiv, einen klaren Bewegungs-Payoff und ein sichtbares Reset- oder Loop-Endbild.'
+      : 'If no preset is selected, keep the look cohesive but open to raw loop turns, abstract geometry, ugly-bright color accidents, tactile reactions, odd details, and scene-specific escalation. Favor one dominant motif per scene, one clear motion payoff, and a visible reset or loop-ready end image.';
   const arcInstruction = buildStoryArcInstruction(arcMode, language);
   const beatInstruction = buildStoryBeatInstruction(language);
   const masterAddition = getStoryEngineMasterAddition(arcMode);
@@ -585,12 +591,12 @@ export function buildStoryEngineSystemInstruction(
       ? 'Die Sequenz darf muralhaft, sonnenverbrannt, deadpan, surreal, leicht verspielt, taktil, grafisch praezise und stark wiederanschaubar wirken, nicht wie ein realistisches Street-Foto, ein glossy Marken-Maskottchen oder chaotischer Tagging-Layer.'
       : mode === 'symbolic'
         ? 'Die Sequenz soll hypnotisch, ruhig, raeumlich, signalhaft, grafisch praezise und sofort lesbar wirken, nicht wie fantasyhafte Lore-Illustration, ueberladenes HUD-Design oder beliebiger Techno-Kitsch.'
-      : 'Die Sequenz soll hypnotisch, erwachsen, experimentell, taktil, streng, filmisch, ikonisch und wiederanschaubar wirken, nicht kindlich, verspielt oder dekorativ.')
+      : 'Die Sequenz soll hypnotisch, erwachsen, experimentell, taktil, roh, abstrakt, underground, ikonisch und wiederanschaubar wirken, nicht kindlich, verspielt, glatt filmisch oder dekorativ.')
     : (mode === 'graffiti'
       ? 'The sequence may feel mural-driven, sun-baked, deadpan, surreal, slightly playful, tactile, graphically precise, and highly rewatchable rather than like a realistic street photo, glossy brand mascot world, or chaotic tagging cloud.'
       : mode === 'symbolic'
         ? 'The sequence should feel hypnotic, calm, spacious, signal-led, graphically precise, and immediately legible rather than like fantasy lore illustration, overloaded HUD clutter, or generic techno kitsch.'
-      : 'The sequence should feel hypnotic, adult, experimental, tactile, controlled, cinematic, iconic, and easy to rewatch rather than cute, playful, or merely decorative.');
+      : 'The sequence should feel hypnotic, adult, experimental, tactile, raw, abstract, underground, iconic, and easy to rewatch rather than cute, playful, slickly cinematic, or merely decorative.');
 
   if (language === 'de') {
     return `Du bist ein KI-Videoregisseur und Storyboard-Kuenstler.
@@ -603,7 +609,7 @@ PFLICHTREGELN:
 4. Nutze das gewaehlte Preset als primaeren Stimmungsanker, nicht als starre Schablone.
 5. Kein Strobo, kein schnelles Blinken, keine sehr schnellen Rotationen, keine nervoesen Motive, Muster, Farben, Formen oder Lichter, keine Hektik.
 6. ${targetFeelDescription}
-7. Suche nach ausgefallenen, aber klar lesbaren Bildern: seltsame Maschinenverhalten, atmosphaerische Ritualmomente, elegante Fehlfunktionen, unerwartete Materialwechsel, harte Nachbilder und absurde aber stimmige Mini-Ereignisse.
+7. Suche nach ausgefallenen, aber klar lesbaren Bildern: rohe Geometrieunfaelle, ugly-bright Farbschluepfe, absurde Underground-Reality-Details, seltsame Maschinenverhalten, elegante Fehlfunktionen, unerwartete Materialwechsel, harte Nachbilder und stimmige Mini-Ereignisse.
 8. Jede gifSpecification soll kurz, produktionsnah und direkt verwendbar sein, idealerweise ein Satz oder zwei kurze Halbsatze, etwa 18 bis 48 Woerter. Nenne zuerst das dominante Motiv und dann den charakteristischen Bewegungs- oder Transformationsmoment.
 9. Keine Feldnamen, Presetnamen oder Labels wie ACTION, MOTION oder CONTINUITY in gifSpecification.
 
@@ -656,10 +662,10 @@ CRITICAL STORYTELLING RULES:
 1. CREATE A NARRATIVE ARC: Do not output 4 static shots of the same thing. There must be clear progression across emergence, escalation, transformation, and afterimage.
 2. ICONIC SCENE DESIGN: Each scene must read immediately as a hero moment with one dominant subject or event, one decisive motion payoff, and a composition that sticks in the first frame.
 3. MEASURED MOTION WITH PAYOFF: Include clear scene-to-scene transitions and subject movement. Allow contrast between stillness and release, tactile chain reactions, strange reveals, and bolder camera punctuation as long as pacing stays readable and each scene resolves into a loop-ready end pose or afterimage.
-4. VISUAL STYLE: Treat the selected preset as the primary mood anchor, but allow scene-specific interpretation as long as the sequence stays cohesive.
+4. VISUAL STYLE: Treat the selected preset as ignition material, not a cage; allow scene-specific mutation as long as the sequence stays cohesive and ARV-readable.
 5. VISUAL SAFETY: No strobe lights, no rapidly blinking lights, no very fast rotating objects, no nervous motifs, movements, patterns, colors, shapes, or lights, and no hectic pacing.
 6. TARGET FEEL: ${targetFeelDescription}
-7. ORIGINALITY: Favor standout images, elegant malfunctions, ritual beats, weird material behavior, and memorable visual hooks over safe repetition.
+7. ORIGINALITY: Favor standout images, raw geometric accidents, ugly-beautiful color slips, absurd underground-reality details, elegant malfunctions, and memorable loop hooks over safe repetition.
 8. PROMPT DISCIPLINE: Each gifSpecification must be a short, punchy, production-ready prompt, ideally one sentence or two short clauses, roughly 18 to 48 words. Name the dominant subject first, then the signature action or transformation.
 9. Do not put labels such as SCENE ACTION, MOTION, CONTINUITY, or preset names inside gifSpecification.
 

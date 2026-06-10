@@ -2,7 +2,7 @@ import type { StylePreset } from './types';
 
 export type StyleFlexMode = 'strict' | 'balanced' | 'loose';
 
-export const DEFAULT_STYLE_FLEX_MODE: StyleFlexMode = 'balanced';
+export const DEFAULT_STYLE_FLEX_MODE: StyleFlexMode = 'loose';
 
 export const STYLE_FLEX_OPTIONS: Array<{ value: StyleFlexMode; label: string; description: string }> = [
   { value: 'strict', label: 'Fokus', description: 'enger am ARV-Kern bleiben' },
@@ -10,37 +10,37 @@ export const STYLE_FLEX_OPTIONS: Array<{ value: StyleFlexMode; label: string; de
   { value: 'loose', label: 'Vielfalt', description: 'mehr Drift und Abweichung erlauben' },
 ];
 
-export const STYLE_TASTE_NAME = 'Open Signal Core';
+export const STYLE_TASTE_NAME = 'Raw Loop Core';
 
 export const STYLE_TASTE_SUMMARY =
-  'Calm but high-contrast ARV image language with one dominant subject or event, strong first-frame readability, quiet signal geometry, nocturnal control-room atmosphere, flexible material logic, and controlled loop motion. Favor atmosphere, precision, and slightly uncanny calm over formula, mascot polish, or decorative clutter.';
+  'Raw early-ARV loop language: abstract geometric forms, saturated signal color, damaged analog texture, absurd underground reality, and one unmistakable loop event. Treat presets as ignition material, not cages; favor strange visual decisions, hard rhythm, and GIF-like repeatability over polished cinematic mood or recurring canon motifs.';
 
 export const STYLE_TASTE_PALETTE =
-  'possible palette anchors: matte black, void blue, pearl white, phosphor cyan, rotten CRT green, ember amber, sodium orange, oxidized copper, bruised violet, metallic silver, deep teal, dust beige, wet concrete, and restrained synthetic glow';
+  'possible palette anchors: dead black, cheap scanner white, phosphor cyan, hot magenta, signal red, acid lime, sodium orange, dirty yellow, bruised violet, cobalt blue, oxidized copper, wet concrete gray, photocopy beige, and abrupt synthetic color collisions';
 
 export const STYLE_TASTE_MOTIFS =
-  'possible motifs: signal rings, eclipse overlaps, hex cores, corner rails, control frames, monitor stacks, machines, structures, synthetic ecologies, weather systems, miniature worlds, abstract fields, bodies reduced to operator gesture or silhouette, reflective objects, pressure diagrams, particles, membranes, seams, fractures, void objects, and evolving material systems';
+  'possible motifs: crude signal rings, wobbling spirals, rectangles, scanner bands, barcode bars, folding grids, rubbery apertures, bent triangles, target marks, broken halos, color blocks, torn flyer geometry, cheap CRT diagrams, leaking silhouettes, pressure dots, absurd machine props, underground club residues, and ordinary objects behaving like signal organisms';
 
 export const STYLE_TASTE_TEXTURE =
-  'available surface cues: phosphor grain, scanline residue, smoked glass, lacquer cracks, matte metal, dust, fog, sediment, paper fiber, CRT haze, fabric weave, wet reflections, magnetic debris, soft bloom, and hard poster contrast';
+  'available surface cues: photocopy dirt, toner dust, VHS crawl, scanline residue, CRT bleed, cheap poster ink, spray overspray, wet concrete, scratched plastic, paper fiber, pixel smear, magnetic debris, soft bloom, rough compression, and hard flyer contrast';
 
 export const STYLE_TASTE_MOTION =
-  'possible motion languages: breathing rings, orbital slips, cursor crawl, slow drift, structural opening and closing, control-light pulsing, corner expansion, code rain, chain reaction, ripple, sway, material leakage, one clear transformation payoff, and a loop-ready return';
+  'possible motion languages: GIF-loop wobble, scanner sweep, one-frame color slip, spiral inhale, grid fold, barcode shuffle, dot burst, shape recoil, rubbery aperture open-close, photocopy duplicate collapse, slow drift into hard snapback, and visible return to frame one';
 
 export const STYLE_TASTE_TARGET =
-  'calm, nocturnal, tactile, legible, atmospheric, slightly uncanny, and immediately readable';
+  'raw, tactile, legible, absurd, underground, rhythm-aware, loopable, high-contrast, and visually singular';
 
 export const STYLE_TASTE_SAFETY =
   'no strobe lights, no rapidly blinking lights, no very fast rotating objects, no nervous motifs, movements, patterns, colors, shapes, or lights, and no hectic pacing';
 
 export const STYLE_TASTE_AVOID =
-  'cute or playful mascots, smiling characters, big expressive eyes, soft pastel palettes, glossy toy-like 3D, rainbow fantasy gradients, anime or childrens-book framing, literal mystical cosplay, decorative pseudo-sacred costume illustration, crowded narrative clutter, photoreal people, frantic glitch spam, and defaulting every scene back into paper-cut witnesses, archive relic theatre, monolith idols, or stone-object folklore when the prompt does not ask for them';
+  'cute or playful mascots, smiling characters, big expressive eyes, soft pastel palettes, glossy toy-like 3D, clean corporate motion graphics, luxury sci-fi moodboards, stock cinematic realism, anime or childrens-book framing, literal mystical cosplay, decorative pseudo-sacred costume illustration, crowded narrative clutter, photoreal people, frantic glitch spam, and defaulting every scene back into paper-cut witnesses, archive relic theatre, monolith idols, stone-object folklore, or any single preset family when the prompt does not ask for it';
 
 export const STYLE_TASTE_SHORT_LABEL =
-  'open ARV core · tactile tension · controlled motion';
+  'raw ARV loops · abstract forms · underground signal reality';
 
 export const STYLE_TASTE_PLACEHOLDER_PROMPT =
-  'A lone structure of light, dust, and pressure shifts once inside a dark field while one material reaction ripples through the scene and returns to the opening pose.';
+  'A crooked geometric signal object wobbles inside black space, flashes one impossible color reaction, duplicates like a bad photocopy, then snaps back into the first frame.';
 
 const STYLE_TASTE_LOCK_HEADER = `STYLE TASTE LOCK (${STYLE_TASTE_NAME}):`;
 
@@ -132,25 +132,25 @@ function getStyleFlexInstruction(styleMode: StyleFlexMode): {
   switch (styleMode) {
     case 'strict':
       return {
-        headline: 'Stay inside a recognizable ARV family resemblance without falling back to the old archive-witness formula.',
-        anchorRule: 'Choose 2-4 anchor traits, keep one dominant subject or event, and preserve negative space around it.',
-        variationRule: 'Allow variation across signal icons, nocturnal control rooms, material systems, and geometric void studies, but keep palette, pacing, and composition controlled.',
-        presetRule: 'If a preset is active, treat it as a strong guide while still allowing subject-specific nuance.',
+        headline: 'Keep the early ARV raw-loop identity recognizable without forcing any old motif family.',
+        anchorRule: 'Choose 2-3 anchor traits, keep one dominant form or event, and make the loop mechanics obvious.',
+        variationRule: 'Allow variation across geometry, color blocks, scanner errors, underground rooms, absurd objects, and signal organisms while keeping the frame readable.',
+        presetRule: 'If a preset is active, treat it as a strong ingredient, not a scene recipe.',
       };
     case 'loose':
       return {
-        headline: 'Keep the result intentional and adult while allowing strong departures in material, palette, and world logic.',
-        anchorRule: 'Choose 1-2 anchor traits, but still keep one dominant subject, sparse composition, and controlled motion.',
-        variationRule: 'Allow stronger shifts between signal-void geometry, control-room interiors, material worlds, graphic abstractions, and color behavior, as long as the result stays adult, legible, and non-cartoon.',
-        presetRule: 'If a preset is active, treat it as a light mood influence rather than a hard constraint.',
+        headline: 'Open the style back up: let the idea mutate into strange abstract loop reality while retaining ARV texture and rhythm.',
+        anchorRule: 'Choose 1-2 anchor traits, but still keep one dominant form, a clear loop event, and strong first-frame readability.',
+        variationRule: 'Allow hard shifts between geometric voids, cheap broadcast graphics, underground room fragments, absurd object rituals, color-field accidents, and tactile material glitches.',
+        presetRule: 'If a preset is active, sample it like a record: steal one useful color, motion, or texture cue and then let the scene find its own form.',
       };
     case 'balanced':
     default:
       return {
-        headline: 'Treat the style as a controlled family resemblance, not a costume kit or motif checklist.',
-        anchorRule: 'Choose 1-3 anchor traits that sharpen the subject; keep one dominant subject or event and leave room around it.',
-        variationRule: 'Allow signal-void icons, nocturnal control interiors, industrial, synthetic, abstract, architectural, atmospheric, ecological, or graphic interpretations, but keep the result hard-edged, sparse, and adult.',
-        presetRule: 'If a preset is active, blend it with scene-specific variation instead of flattening the result.',
+        headline: 'Treat the style as a raw loop language, not a costume kit or motif checklist.',
+        anchorRule: 'Choose 1-3 traits that sharpen the image; keep one dominant form or event and make the loop return visible.',
+        variationRule: 'Allow signal geometry, underground interiors, industrial scraps, absurd objects, abstract fields, crude diagrams, color accidents, and material mutations, but keep the result hard-edged and readable.',
+        presetRule: 'If a preset is active, blend only the useful parts with scene-specific invention instead of flattening the result.',
       };
   }
 }

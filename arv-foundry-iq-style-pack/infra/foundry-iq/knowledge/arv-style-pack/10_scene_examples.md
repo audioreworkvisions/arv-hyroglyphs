@@ -11,7 +11,7 @@ A central black electro-boogie silhouette stands inside a tall vertical amber wi
 
 The dancer holds a poised stillness. Then one minimal shoulder twitch triggers a Xerox duplication effect: five cyan-magenta copies peel sideways from the shoulder and upper arm like wet paper prints hanging from invisible threads. The copies tremble for one beat, then pull back into the central silhouette. The final pose tightens the frame: one clean black figure, shoulder locked, faint magenta residue at the edge.
 
-seamless looping GIF-style video, 4 to 6 seconds, one dominant subject or event, locked camera, strong first-frame readability, dark uncluttered background, no strobe, no rapid blinking, no hectic pacing.
+seamless looping GIF-style video, 4, 8, or 12 seconds, one dominant subject or event, locked camera, strong first-frame readability, dark uncluttered background, no strobe, no rapid blinking, no hectic pacing.
 
 ## Example 2: Cyber Monk Street Mural
 

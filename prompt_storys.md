@@ -1,6 +1,6 @@
-# Calm Trippy Prompt Archive
+# Raw ARV Loop Prompt Archive
 
-This archive is intentionally aligned to the relaxed visual guardrails of the current Hyroglyphis style system.
+This archive is aligned to the rawer early Hyroglyphis direction: abstract forms, damaged analog texture, absurd underground-reality details, and GIF-like loops with visible reset mechanics.
 
 Non-negotiable visual guardrails
 
@@ -9,19 +9,27 @@ Non-negotiable visual guardrails
 - no very fast rotating objects
 - no nervous motifs, movements, patterns, colors, shapes, or lights
 - no hectic pacing
-- aim for hypnotic, pleasant, intriguing, trippy, spacious loops
+- aim for hypnotic, raw, intriguing, trippy, spacious loops with one memorable visual mistake and a clean return
 
 General style constraints
 
-- seamless looping GIF-style video, 4 to 6 seconds
+- seamless looping GIF-style video, 4, 8, or 12 seconds
 - no text, no watermark, no logo
 - centered or clearly intentional composition
-- calm repetitive motion, locked or patient camera
-- dark, nocturnal, or void-biased backgrounds preferred
+- controlled repetitive motion, locked camera, visible reset or snapback
+- dark, nocturnal, void-biased, CRT, concrete, flyer, scanner, or underground-room backgrounds preferred
 
 Negative prompt
 
-- no readable text, no subtitles, no logos, no watermark, no realistic gore, no slapstick comedy framing, no daylight realism, no shaky handheld camera, no random scene cuts, no extra eyes outside the main composition
+- no readable text, no subtitles, no logos, no watermark, no realistic gore, no slapstick comedy framing, no daylight realism, no shaky handheld camera, no random scene cuts, no extra eyes outside the main composition, no luxury sci-fi wallpaper, no clean corporate motion graphics
+
+Raw Loop Baselines
+
+- A crooked acid-lime spiral is trapped inside a red scanner rectangle on black CRT paper; it inhales once, misregisters cyan and magenta, leaves toner residue, then snaps back to frame one.
+- Three dirty flyer color blocks slide over a black scanline grid, knock the bars out of register for one beat, then lock back into a clean underground GIF loop.
+- A rubbery ivory aperture is squeezed by cyan and magenta barcode rails while sodium-orange ticks pulse once at the edges, then the shape recoils to its opening pose.
+- A wet concrete corner holds one hovering violet triangle; the triangle folds inward, reveals a dirty white scanner ghost, and returns to a flat black silhouette.
+- A malformed signal object made from dots, bars, and pressure circles wobbles in dead black space, commits one ugly-bright color mistake, and resets with photocopy echo.
 
 Signal Ring Eclipse
 
@@ -104,4 +112,4 @@ Story sequence seeds
 
 Favorite baseline prompt
 
-- A ceremonial signal ring floats in matte black space, cobalt and cyan halos breathing around a tiny white core while faint orbital diagrams drift at the edges, seamless hypnotic loop, no text, no logo.
+- A crooked geometric signal object floats in matte black space, hot magenta and cyan edges misregistering around a dirty white core while one acid-lime scanner band reveals an absurd hidden contour, then the whole image snaps back into a seamless GIF loop, no text, no logo.

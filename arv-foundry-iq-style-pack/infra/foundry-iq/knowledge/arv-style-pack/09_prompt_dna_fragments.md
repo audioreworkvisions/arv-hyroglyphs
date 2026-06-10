@@ -7,6 +7,10 @@ tags: [prompt-dna, reusable-fragments, prompt-parts]
 
 ## Opening Fragments
 
+- A crooked acid-lime spiral appears inside a red scanner rectangle on black CRT paper.
+- Three dirty flyer color blocks slide over a black scanline grid.
+- A malformed signal object made from dots, bars, and pressure rings wobbles in dead black space.
+- A rubbery ivory aperture is squeezed between cyan and magenta barcode rails.
 - A black electro-boogie silhouette appears like a damaged photocopy on black paper.
 - A hooded transmission monk sits in front of a red-cyan signal halo.
 - A central silhouette stands inside a tall vertical amber window.
@@ -15,6 +19,10 @@ tags: [prompt-dna, reusable-fragments, prompt-parts]
 
 ## Texture Fragments
 
+- dirty scanner glass, toner dust, CRT bleed, cheap flyer ink
+- wet concrete blackness with hot-magenta edge ghosts
+- acid-lime color slip caught in VHS crawl
+- warning-red scan gate over matte black negative space
 - wet Xerox paper, toner dust, paper fibers, old rave flyer grain
 - CRT bleed gathering at the frame edges
 - magenta chromatic copies peeling sideways
@@ -25,6 +33,10 @@ tags: [prompt-dna, reusable-fragments, prompt-parts]
 
 ## Motion Fragments
 
+- one scanner sweep reveals an absurd hidden contour and erases it
+- the spiral inhales into a dot, slips magenta, and unwinds back to frame one
+- three color blocks knock the grid out of register and snap it back
+- the barcode rails squeeze the aperture once, then release into the opening pose
 - one minimal shoulder twitch
 - shoulder pop -> elbow lock -> wrist snap -> hard freeze
 - the duplicate arms fan outward and slam back into one black shape
@@ -34,6 +46,10 @@ tags: [prompt-dna, reusable-fragments, prompt-parts]
 
 ## Payoff Fragments
 
+- snapping back into the first frame with toner residue
+- leaving one ugly-bright color mistake at the edge
+- the hidden contour vanishes as if the scanner regretted it
+- the loop closes with a hard geometric freeze
 - resolving into a hard black end pose
 - leaving only faint magenta residue at the wrist
 - all duplicate copies collapse back toward the central body
@@ -42,4 +58,4 @@ tags: [prompt-dna, reusable-fragments, prompt-parts]
 
 ## Negative Fragment
 
-seamless looping GIF-style video, 4 to 6 seconds, one dominant subject or event, controlled hypnotic motion with one clear payoff, locked camera, strong first-frame readability, loop-ready end pose or afterimage, dark uncluttered background, no strobe lights, no rapid blinking, no hectic pacing. Negative prompt: avoid prominent text overlays, obvious logos, watermark artifacts, aggressive flashing, glossy ad polish, frantic glitch spam.
+seamless looping GIF-style video, 4, 8, or 12 seconds, one dominant geometric form, absurd object, or event, controlled hypnotic motion with one clear payoff, locked camera, strong first-frame readability, visible snapback or loop-ready afterimage, dark uncluttered background, no strobe lights, no rapid blinking, no hectic pacing. Negative prompt: avoid prominent text overlays, obvious logos, watermark artifacts, aggressive flashing, glossy ad polish, corporate motion graphics, luxury sci-fi wallpaper, frantic glitch spam.
