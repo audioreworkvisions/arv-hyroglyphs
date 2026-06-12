@@ -38,6 +38,11 @@ import type { IQBrief } from '../utils/iq';
 import { mergeIQSceneContext, normalizeIQBriefForDebug, resolveIQBrief } from '../utils/iq';
 import { sanitizeSatireSketch } from '../utils/storyboard';
 import { VIDEO_FAILURE_STATUSES, VIDEO_SUCCESS_STATUSES, sleep } from '../utils/video';
+import {
+  listStoryMemoryCards,
+  normalizeStoryMemoryCard,
+  writeStoryMemoryCard,
+} from '../services/stillframeStoryMemoryService';
 
 const STILLFRAME_PRESET: StylePreset | null = null;
 const STILLFRAME_STYLE_TASTE_PRESET: StylePreset | null = null;
@@ -1177,6 +1182,29 @@ const buildFallbackScenePrompt = (seed: RandomSceneSeed): string =>
 
 export const createStillframeRoutes = () => {
   const router = Router();
+
+  /** GET /api/stillframe/story-memory */
+  router.get('/api/stillframe/story-memory', async (_req, res) => {
+    try {
+      const memories = await listStoryMemoryCards(30);
+      return res.json({ success: true, memories });
+    } catch (error) {
+      console.error('Stillframe story-memory list Fehler:', error);
+      return res.status(500).json({ error: toErrorMessage(error, 'Story memory lookup failed') });
+    }
+  });
+
+  /** POST /api/stillframe/story-memory/write */
+  router.post('/api/stillframe/story-memory/write', async (req, res) => {
+    try {
+      const memoryCard = normalizeStoryMemoryCard(req.body?.memoryCard);
+      const result = await writeStoryMemoryCard(memoryCard);
+      return res.json({ success: true, memoryCard, ...result });
+    } catch (error) {
+      console.error('Stillframe story-memory write Fehler:', error);
+      return res.status(500).json({ error: toErrorMessage(error, 'Story memory write failed') });
+    }
+  });
 
   /**
    * POST /api/stillframe/ideas

@@ -1,4 +1,5 @@
 import React, { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
+import JSZip from 'jszip';
 import {
   BookOpen,
   Camera,
@@ -175,7 +176,7 @@ interface StillframeGeneratedContext {
   referenceStyle: StillframeReferenceStyleSummary | null;
 }
 
-type StudioView = 'demo' | 'werkstatt';
+type StudioView = 'demo' | 'manual-demo' | 'werkstatt';
 
 type PipelineLogLevel = 'info' | 'detail' | 'success' | 'error';
 
@@ -184,6 +185,33 @@ interface PipelineLogEntry {
   time: number;
   level: PipelineLogLevel;
   text: string;
+}
+
+interface StillframeStoryMemoryScene {
+  index: number;
+  beat: string;
+  title: string;
+  prompt: string;
+  motion: string;
+  durationSeconds?: number;
+  videoId?: string | null;
+  remixedFromVideoId?: string | null;
+  videoTransformMode?: VideoTransformMode | null;
+}
+
+interface StillframeStoryMemoryCard {
+  type: 'stillframe_story_memory';
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  title: string;
+  sourcePrompt: string;
+  storyConcept: string;
+  continuationOf?: string | null;
+  referenceStyle?: StillframeReferenceStyleSummary | null;
+  stylePresets: StillframeStylePresetSummary[];
+  scenes: StillframeStoryMemoryScene[];
+  notes?: string;
 }
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -379,6 +407,30 @@ const downloadDataUrl = (dataUrl: string, filename: string) => {
   a.href = dataUrl;
   a.download = filename;
   a.click();
+};
+
+const sanitizeFilenamePart = (value: string): string => (
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gi, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80) || 'story'
+);
+
+const downloadBlob = (blob: Blob, filename: string) => {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 250);
+};
+
+const addAssetToZip = async (zip: JSZip, path: string, assetUrl: string) => {
+  const response = await fetch(assetUrl);
+  const blob = await response.blob();
+  zip.file(path, blob);
 };
 
 const copyText = async (value: string): Promise<boolean> => {
@@ -582,6 +634,12 @@ export default function StillframeHarness({
   const [demoRun, setDemoRun] = useState<DemoRunState>(IDLE_DEMO_RUN);
   const [studioView, setStudioView] = useState<StudioView>('demo');
   const [pipelineLog, setPipelineLog] = useState<PipelineLogEntry[]>([]);
+  const [isDownloadingStoryZip, setIsDownloadingStoryZip] = useState(false);
+  const [storyMemories, setStoryMemories] = useState<StillframeStoryMemoryCard[]>([]);
+  const [selectedStoryMemoryId, setSelectedStoryMemoryId] = useState('');
+  const [isLoadingStoryMemories, setIsLoadingStoryMemories] = useState(false);
+  const [isSavingStoryMemory, setIsSavingStoryMemory] = useState(false);
+  const [storyMemoryMessage, setStoryMemoryMessage] = useState<string | null>(null);
   const [isPreparingReferences, setIsPreparingReferences] = useState(false);
   const [conceptError, setConceptError] = useState<string | null>(null);
   const [referenceError, setReferenceError] = useState<string | null>(null);
@@ -760,7 +818,7 @@ export default function StillframeHarness({
   ), [referenceImages]);
 
   const buildReferenceStyleOverride = useCallback(() => (
-    referenceImages.length > 0 && referenceStyle
+    referenceStyle
       ? {
         summary: referenceStyle.summary,
         subjectFocus: referenceStyle.subjectFocus,
@@ -770,7 +828,7 @@ export default function StillframeHarness({
         keywords: referenceStyle.keywords,
       }
       : undefined
-  ), [referenceImages.length, referenceStyle]);
+  ), [referenceStyle]);
 
   const applyUsageSummary = useCallback((usage: any) => {
     if (!usage) {
@@ -1004,9 +1062,15 @@ export default function StillframeHarness({
 
   // ── Concept generation ─────────────────────────────────────────────────────
 
-  const runGenerateConcept = useCallback(async (conceptSeed: string, preparedKeywords: string[]) => {
+  const runGenerateConcept = useCallback(async (
+    conceptSeed: string,
+    preparedKeywords: string[],
+    options?: { referenceStyleOverride?: StillframeReferenceStyleSummary | null },
+  ) => {
     const trimmedConcept = conceptSeed.trim();
-    const referenceStyleOverride = buildReferenceStyleOverride();
+    const referenceStyleOverride = options && 'referenceStyleOverride' in options
+      ? options.referenceStyleOverride
+      : buildReferenceStyleOverride();
 
     if (!trimmedConcept && preparedKeywords.length < MIN_KEYWORDS && referenceImages.length === 0) {
       setConceptError(`Bitte mindestens ${MIN_KEYWORDS} Schlagwoerter, ein Referenzbild oder einen freien Concept-Text eingeben.`);
@@ -1621,6 +1685,285 @@ export default function StillframeHarness({
     setIsRenderingAllVideos(false);
   };
 
+  const handleDownloadStoryZip = useCallback(async () => {
+    const currentScenes = scenesRef.current;
+    if (currentScenes.length === 0 || isDownloadingStoryZip) {
+      return;
+    }
+
+    setIsDownloadingStoryZip(true);
+
+    try {
+      const safeStoryName = sanitizeFilenamePart(storyTitle || concept || 'arv-demo-story');
+      const zip = new JSZip();
+      const metadata = {
+        exportedAt: new Date().toISOString(),
+        runId,
+        storyTitle,
+        storyConcept,
+        mode: outputMode ?? generationMode,
+        sourcePrompt: concept.trim() || null,
+        referenceStyle,
+        stylePresets,
+        scenes: currentScenes.map((scene, index) => ({
+          index: index + 1,
+          beat: scene.beat,
+          title: scene.title,
+          prompt: scene.prompt,
+          motion: scene.motion,
+          durationSeconds: scene.durationSeconds,
+          videoId: scene.videoId,
+          remixedFromVideoId: scene.remixedFromVideoId,
+          videoTransformMode: scene.videoTransformMode,
+          hasGif: Boolean(scene.gifData),
+          hasSketch: Boolean(scene.sketchData),
+          renderPromptDebug: scene.renderPromptDebug,
+        })),
+      };
+
+      zip.file('story.json', JSON.stringify(metadata, null, 2));
+      zip.file('prompts.md', [
+        `# ${storyTitle || 'ARV Demo Story'}`,
+        '',
+        storyConcept || concept.trim() || 'Kein Story-Concept gespeichert.',
+        '',
+        `Modus: ${GENERATION_MODE_LABELS[(outputMode ?? generationMode) as GenerationMode]}`,
+        '',
+        ...currentScenes.flatMap((scene, index) => [
+          `## Szene ${index + 1} · ${scene.title}`,
+          '',
+          `Beat: ${scene.beat}`,
+          '',
+          `Motion: ${scene.motion}`,
+          '',
+          scene.prompt,
+          '',
+        ]),
+      ].join('\n'));
+
+      await Promise.all(currentScenes.map(async (scene, index) => {
+        const scenePrefix = `scene-${String(index + 1).padStart(2, '0')}`;
+        if (scene.gifData) {
+          await addAssetToZip(zip, `${scenePrefix}/${scenePrefix}-loop.gif`, scene.gifData);
+        }
+        if (scene.sketchData) {
+          await addAssetToZip(zip, `${scenePrefix}/${scenePrefix}-sketch.png`, scene.sketchData);
+        }
+      }));
+
+      const blob = await zip.generateAsync({ type: 'blob' });
+      downloadBlob(blob, `${safeStoryName}-scenes.zip`);
+      pushPipelineLog('success', `Story-ZIP exportiert · ${currentScenes.filter((scene) => scene.gifData).length} GIF-Loops · ${currentScenes.length} Szenenprompts`);
+    } catch (err: any) {
+      pushPipelineLog('error', `Story-ZIP konnte nicht erstellt werden: ${err.message || 'Export failed.'}`);
+    } finally {
+      setIsDownloadingStoryZip(false);
+    }
+  }, [concept, generationMode, isDownloadingStoryZip, outputMode, pushPipelineLog, referenceStyle, runId, storyConcept, storyTitle, stylePresets]);
+
+  const buildStoryMemoryPayload = useCallback((continuationOf?: string | null): StillframeStoryMemoryCard | null => {
+    const currentScenes = scenesRef.current;
+    if (currentScenes.length === 0) {
+      return null;
+    }
+
+    const now = new Date().toISOString();
+    return {
+      type: 'stillframe_story_memory',
+      id: `story-memory-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+      createdAt: now,
+      updatedAt: now,
+      title: storyTitle || concept.trim().slice(0, 80) || 'ARV Stillframe Story',
+      sourcePrompt: concept.trim(),
+      storyConcept: storyConcept || concept.trim(),
+      continuationOf: continuationOf || null,
+      referenceStyle,
+      stylePresets,
+      scenes: currentScenes.map((scene, index) => ({
+        index: index + 1,
+        beat: scene.beat,
+        title: scene.title,
+        prompt: scene.prompt,
+        motion: scene.motion,
+        durationSeconds: scene.durationSeconds,
+        videoId: scene.videoId,
+        remixedFromVideoId: scene.remixedFromVideoId,
+        videoTransformMode: scene.videoTransformMode,
+      })),
+      notes: 'Saved from Hyroglyphs manual demo flow for Foundry IQ story continuation.',
+    };
+  }, [concept, referenceStyle, storyConcept, storyTitle, stylePresets]);
+
+  const loadStoryMemories = useCallback(async () => {
+    setIsLoadingStoryMemories(true);
+    setStoryMemoryMessage(null);
+    try {
+      const res = await fetch('/api/stillframe/story-memory');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Story memory lookup failed.');
+      const memories = Array.isArray(data.memories) ? data.memories : [];
+      setStoryMemories(memories);
+      if (!selectedStoryMemoryId && memories[0]?.id) {
+        setSelectedStoryMemoryId(memories[0].id);
+      }
+      setStoryMemoryMessage(memories.length > 0
+        ? `${memories.length} Story-Memory-Datei(en) geladen.`
+        : 'Noch keine gespeicherten Story-Memories vorhanden.');
+    } catch (err: any) {
+      setStoryMemoryMessage(err.message || 'Story-Memory konnte nicht geladen werden.');
+    } finally {
+      setIsLoadingStoryMemories(false);
+    }
+  }, [selectedStoryMemoryId]);
+
+  const selectedStoryMemory = storyMemories.find((memory) => memory.id === selectedStoryMemoryId) || null;
+
+  const applyStoryMemoryToEditor = useCallback((memory: StillframeStoryMemoryCard) => {
+    const nextScenes = initScenes(memory.scenes.slice(0, 4).map((scene, index) => ({
+      beat: (['scene-1', 'scene-2', 'scene-3', 'scene-4'][index] ?? scene.beat) as BeatType,
+      title: scene.title || `Szene ${index + 1}`,
+      prompt: scene.prompt,
+      motion: scene.motion,
+    })));
+    scenesRef.current = nextScenes;
+    setScenes(nextScenes);
+    setStoryTitle(memory.title);
+    setStoryConcept(memory.storyConcept || memory.sourcePrompt);
+    setConcept(memory.sourcePrompt || memory.storyConcept || memory.title);
+    setReferenceStyle(memory.referenceStyle ?? null);
+    setStylePresets(memory.stylePresets || []);
+    setOutputMode('ritual');
+    setGenerationMode('ritual');
+    setRunId(new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-'));
+    setStoryMemoryMessage(`Story-Memory „${memory.title}“ in die manuelle Demo geladen.`);
+    pushPipelineLog('detail', `Story-Memory geladen: „${memory.title}“ · ${memory.scenes.length} gespeicherte Szenen`);
+  }, [pushPipelineLog]);
+
+  const handleSaveStoryMemory = useCallback(async (continuationOf?: string | null) => {
+    const memoryCard = buildStoryMemoryPayload(continuationOf);
+    if (!memoryCard || isSavingStoryMemory) {
+      return;
+    }
+
+    setIsSavingStoryMemory(true);
+    setStoryMemoryMessage(null);
+    try {
+      const res = await fetch('/api/stillframe/story-memory/write', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ memoryCard }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Story memory write failed.');
+      setStoryMemories((previous) => [data.memoryCard, ...previous.filter((memory) => memory.id !== data.memoryCard.id)]);
+      setSelectedStoryMemoryId(data.memoryCard.id);
+      setStoryMemoryMessage(`Story-Memory gespeichert: ${data.markdownPath}. Sync: scripts/sync-stillframe-story-memory.ps1`);
+      pushPipelineLog('success', `Story-Memory gespeichert · ${data.memoryCard.title}`);
+    } catch (err: any) {
+      setStoryMemoryMessage(err.message || 'Story-Memory konnte nicht gespeichert werden.');
+      pushPipelineLog('error', `Story-Memory speichern fehlgeschlagen: ${err.message || 'write failed'}`);
+    } finally {
+      setIsSavingStoryMemory(false);
+    }
+  }, [buildStoryMemoryPayload, isSavingStoryMemory, pushPipelineLog]);
+
+  const handleContinueStoryMemory = useCallback(async () => {
+    if (!selectedStoryMemory || isGeneratingConcept) {
+      return;
+    }
+
+    const lastScene = selectedStoryMemory.scenes[selectedStoryMemory.scenes.length - 1];
+    const continuationSeed = [
+      `Fortsetzung der gespeicherten ARV-Story „${selectedStoryMemory.title}“.`,
+      selectedStoryMemory.storyConcept,
+      selectedStoryMemory.referenceStyle?.summary ? `Erhalte Style-DNA: ${selectedStoryMemory.referenceStyle.summary}` : '',
+      selectedStoryMemory.referenceStyle?.promptDNA ? `Prompt-DNA: ${selectedStoryMemory.referenceStyle.promptDNA}` : '',
+      lastScene ? `Setze nach Szene ${lastScene.index} fort: ${lastScene.title}. Letzter Prompt: ${lastScene.prompt}` : '',
+      'Schreibe vier neue, spätere Szenen als direkte Fortsetzung; nicht neu starten, sondern Motive, Palette, Motion-Grammar und Chronologie weiterführen.',
+    ].filter(Boolean).join('\n');
+
+    const memoryKeywords = selectedStoryMemory.referenceStyle?.keywords?.slice(0, MAX_KEYWORDS) ?? [];
+    setConcept(continuationSeed);
+    setReferenceStyle(selectedStoryMemory.referenceStyle ?? null);
+    setStylePresets(selectedStoryMemory.stylePresets || []);
+    setPipelineLog([]);
+    pushPipelineLog('info', `Story-Fortsetzung gestartet · Basis: „${selectedStoryMemory.title}“`);
+    const generatedContext = await runGenerateConcept(continuationSeed, memoryKeywords, {
+      referenceStyleOverride: selectedStoryMemory.referenceStyle ?? null,
+    });
+    if (generatedContext && scenesRef.current.length > 0) {
+      pushPipelineLog('success', `Fortsetzung generiert: „${generatedContext.storyTitle ?? selectedStoryMemory.title}“ · speichere neue Story-Memory…`);
+      const now = new Date().toISOString();
+      const memoryCard: StillframeStoryMemoryCard = {
+        type: 'stillframe_story_memory',
+        id: `story-memory-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+        createdAt: now,
+        updatedAt: now,
+        title: generatedContext.storyTitle || `Fortsetzung · ${selectedStoryMemory.title}`,
+        sourcePrompt: continuationSeed,
+        storyConcept: generatedContext.storyConcept || continuationSeed,
+        continuationOf: selectedStoryMemory.id,
+        referenceStyle: generatedContext.referenceStyle || selectedStoryMemory.referenceStyle || null,
+        stylePresets: generatedContext.stylePresets,
+        scenes: scenesRef.current.map((scene, index) => ({
+          index: index + 1,
+          beat: scene.beat,
+          title: scene.title,
+          prompt: scene.prompt,
+          motion: scene.motion,
+          durationSeconds: scene.durationSeconds,
+          videoId: scene.videoId,
+          remixedFromVideoId: scene.remixedFromVideoId,
+          videoTransformMode: scene.videoTransformMode,
+        })),
+        notes: `Continuation of ${selectedStoryMemory.title}`,
+      };
+      setIsSavingStoryMemory(true);
+      try {
+        const res = await fetch('/api/stillframe/story-memory/write', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ memoryCard }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Story memory write failed.');
+        setStoryMemories((previous) => [data.memoryCard, ...previous.filter((memory) => memory.id !== data.memoryCard.id)]);
+        setSelectedStoryMemoryId(data.memoryCard.id);
+        setStoryMemoryMessage(`Fortsetzung gespeichert: ${data.markdownPath}. Sync: scripts/sync-stillframe-story-memory.ps1`);
+        pushPipelineLog('success', `Story-Fortsetzung gespeichert · ${data.memoryCard.title}`);
+      } catch (err: any) {
+        setStoryMemoryMessage(err.message || 'Fortsetzung konnte nicht gespeichert werden.');
+        pushPipelineLog('error', `Fortsetzung speichern fehlgeschlagen: ${err.message || 'write failed'}`);
+      } finally {
+        setIsSavingStoryMemory(false);
+      }
+    }
+  }, [isGeneratingConcept, pushPipelineLog, runGenerateConcept, selectedStoryMemory]);
+
+  useEffect(() => {
+    if (studioView === 'manual-demo' && storyMemories.length === 0 && !isLoadingStoryMemories) {
+      void loadStoryMemories();
+    }
+  }, [isLoadingStoryMemories, loadStoryMemories, storyMemories.length, studioView]);
+
+  const handleManualDemoGenerateScenes = useCallback(async () => {
+    const trimmed = concept.trim();
+    const preparedKeywords = keywordInput.trim() ? mergeKeywords(keywords, keywordInput) : keywords;
+
+    if (keywordInput.trim()) {
+      setKeywords(preparedKeywords);
+      setKeywordInput('');
+    }
+
+    setGenerationMode('ritual');
+    setPipelineLog([]);
+    pushPipelineLog('info', 'Manueller Demo-Flow gestartet · Prompt + Stilreferenzen werden zu 4 Szenenprompts verdichtet…');
+    const generatedContext = await runGenerateConcept(trimmed, preparedKeywords);
+    if (generatedContext && scenesRef.current.length > 0) {
+      pushPipelineLog('success', `Manueller Demo-Flow fertig: „${generatedContext.storyTitle ?? 'ohne Titel'}“ · ${scenesRef.current.length} editierbare Szenenprompts geschrieben`);
+    }
+  }, [concept, keywordInput, keywords, pushPipelineLog, runGenerateConcept]);
+
   // ── One-Click Demo Run (Agents League) ──────────────────────────────
 
   const handleDemoRun = async () => {
@@ -1800,6 +2143,15 @@ export default function StillframeHarness({
             </button>
             <button
               type="button"
+              onClick={() => setStudioView('manual-demo')}
+              className={`rounded-xl px-3 py-2 font-mono text-[10px] font-semibold transition ${studioView === 'manual-demo'
+                ? 'border border-[rgba(232,193,106,0.34)] bg-[rgba(54,36,8,0.9)] text-[#ffd980]'
+                : 'border border-transparent text-[#4a7090] hover:text-[#c8ddf0]'}`}
+            >
+              Manuelle Demo
+            </button>
+            <button
+              type="button"
               onClick={() => setStudioView('werkstatt')}
               className={`rounded-xl px-3 py-2 font-mono text-[10px] font-semibold transition ${studioView === 'werkstatt'
                 ? 'border border-[rgba(168,118,255,0.34)] bg-[rgba(38,20,64,0.92)] text-[#c7a7ff]'
@@ -1897,6 +2249,20 @@ export default function StillframeHarness({
               <span className="text-[#72e4ff]">@audioreworkvisions</span>: KI-generierte, loopbare GIF-Szenen,
               die als GIF-Dia-Show das fertige Video simulieren und als Video-Quelle in Streams und Releases laufen –
               stilistisch verankert in der ARV-Ästhetik über Foundry-IQ-Grounding.
+            </p>
+          </div>
+        ) : studioView === 'manual-demo' ? (
+          <div className="space-y-2">
+            <div className="font-mono text-[11px] uppercase tracking-[0.24em] text-[#ffd980]">
+              Manuelle Demo · Prompt + Style Extraction
+            </div>
+            <h1 className="font-mono text-2xl font-bold tracking-tight text-[#f3f8ff]">
+              Vier Szenenprompts aus einer einfachen Idee und einem Stilbild
+            </h1>
+            <p className="text-sm text-[#4a6a8a] max-w-3xl">
+              Diese zweite Demo-Seite ist bewusst kompakt: Ein kurzer Prompt und ein oder mehrere Referenzbilder reichen,
+              damit Hyroglyphs die ARV-Style-DNA extrahiert und automatisch vier editierbare Szenenprompts für die
+              GIF-Dia-Show auf <span className="text-[#72e4ff]">@audioreworkvisions</span> schreibt.
             </p>
           </div>
         ) : (
@@ -2002,6 +2368,26 @@ export default function StillframeHarness({
             </div>
           )}
 
+          {scenes.length > 0 && (
+            <div className="flex flex-wrap items-center gap-3 rounded-[16px] border border-[rgba(232,193,106,0.16)] bg-[rgba(42,28,6,0.36)] px-4 py-3">
+              <div className="min-w-0 flex-1">
+                <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#ffd980]">Szenen-ZIP</div>
+                <div className="mt-1 text-xs text-[#b9a06d]">
+                  Exportiert Story-Metadaten, alle vier Prompts und vorhandene Sketch/GIF-Assets fuer die Dia-Show.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => void handleDownloadStoryZip()}
+                disabled={isDownloadingStoryZip}
+                className="flex items-center gap-2 rounded-xl border border-[rgba(232,193,106,0.3)] bg-[rgba(58,38,8,0.82)] px-4 py-2.5 font-mono text-[11px] font-semibold text-[#ffd980] transition hover:bg-[rgba(74,48,10,0.9)] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {isDownloadingStoryZip ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                ZIP downloaden
+              </button>
+            </div>
+          )}
+
           {/* Live Pipeline Log */}
           {pipelineLog.length > 0 && (
             <div className="rounded-[16px] border border-[rgba(114,228,255,0.14)] bg-[rgba(3,8,18,0.85)] p-3 space-y-2">
@@ -2034,6 +2420,260 @@ export default function StillframeHarness({
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+        </section>
+        )}
+
+        {studioView === 'manual-demo' && (
+        <section className="rounded-[24px] border border-[rgba(232,193,106,0.22)] bg-[linear-gradient(135deg,rgba(34,22,6,0.86),rgba(7,14,28,0.88))] p-5 space-y-5 backdrop-blur-sm">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="max-w-3xl space-y-1.5">
+              <div className="font-mono text-[11px] uppercase tracking-[0.24em] text-[#ffd980]">
+                Agents League · Manual Demo Flow
+              </div>
+              <h2 className="font-mono text-lg font-semibold text-[#f3f8ff]">
+                Simple Prompt + Style-Upload → 4 Szenenprompts
+              </h2>
+              <p className="text-xs leading-relaxed text-[#b9a06d]">
+                Für die Live-Demo kannst du einen sehr kurzen visuellen Impuls eintippen und ein Stilbild hochladen.
+                Die bestehende Style-Extraction liest Palette, Material, Licht und Prompt-DNA aus den Bildern und schreibt daraus automatisch vier Story-Beats, die anschließend als GIFs gerendert oder als Szenen-ZIP exportiert werden.
+              </p>
+            </div>
+            {scenes.length > 0 && (
+              <button
+                type="button"
+                onClick={() => void handleDownloadStoryZip()}
+                disabled={isDownloadingStoryZip}
+                className="flex items-center gap-2 rounded-xl border border-[rgba(232,193,106,0.34)] bg-[rgba(58,38,8,0.82)] px-4 py-2.5 font-mono text-[11px] font-semibold text-[#ffd980] transition hover:bg-[rgba(74,48,10,0.9)] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {isDownloadingStoryZip ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                Szenen-ZIP downloaden
+              </button>
+            )}
+          </div>
+
+          <div className="rounded-[18px] border border-[rgba(114,228,255,0.14)] bg-[rgba(4,12,24,0.72)] p-4 space-y-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0 space-y-1">
+                <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-[#72e4ff]">Foundry IQ Story Memory</div>
+                <p className="max-w-3xl text-xs leading-relaxed text-[#8ea6c3]">
+                  Speichert Prompt, extrahierte Style-DNA und Szenen als Markdown-Story-Memory. Gespeicherte Stories lassen sich hier wieder laden oder direkt fortsetzen; neue Fortsetzungen werden erneut als Story-Memory abgelegt.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void loadStoryMemories()}
+                  disabled={isLoadingStoryMemories}
+                  className="inline-flex items-center gap-2 rounded-xl border border-[rgba(114,228,255,0.18)] bg-[rgba(10,26,46,0.72)] px-3 py-2 font-mono text-[10px] font-semibold text-[#72e4ff] transition hover:bg-[rgba(18,38,64,0.82)] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {isLoadingStoryMemories ? <Loader2 size={12} className="animate-spin" /> : <Database size={12} />}
+                  Memory abrufen
+                </button>
+                {scenes.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => void handleSaveStoryMemory(selectedStoryMemory?.id ?? null)}
+                    disabled={isSavingStoryMemory}
+                    className="inline-flex items-center gap-2 rounded-xl border border-[rgba(141,240,180,0.2)] bg-[rgba(10,40,24,0.56)] px-3 py-2 font-mono text-[10px] font-semibold text-[#8df0b4] transition hover:bg-[rgba(14,52,30,0.68)] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {isSavingStoryMemory ? <Loader2 size={12} className="animate-spin" /> : <BookOpen size={12} />}
+                    Als story.md speichern
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {storyMemories.length > 0 && (
+              <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
+                <label className="space-y-2">
+                  <span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#4a7090]">Gespeicherte Story</span>
+                  <div className="relative">
+                    <select
+                      value={selectedStoryMemoryId}
+                      onChange={(event) => setSelectedStoryMemoryId(event.target.value)}
+                      aria-label="Gespeicherte Story-Memory auswählen"
+                      className="w-full appearance-none rounded-xl border border-[rgba(114,228,255,0.18)] bg-[#071221] px-4 py-3 pr-9 font-mono text-[11px] text-[#c8ddf0] outline-none transition focus:border-[#72e4ff]"
+                    >
+                      {storyMemories.map((memory) => (
+                        <option key={memory.id} value={memory.id}>
+                          {memory.title} · {memory.scenes.length} Szenen · {new Date(memory.updatedAt).toLocaleDateString('de-DE')}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronsDown size={13} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#4a7090]" />
+                  </div>
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => selectedStoryMemory && applyStoryMemoryToEditor(selectedStoryMemory)}
+                    disabled={!selectedStoryMemory}
+                    className="inline-flex items-center gap-2 rounded-xl border border-[rgba(114,228,255,0.18)] bg-[rgba(10,26,46,0.72)] px-3 py-3 font-mono text-[10px] font-semibold text-[#72e4ff] transition hover:bg-[rgba(18,38,64,0.82)] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <Copy size={12} />
+                    Wiederverwenden
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleContinueStoryMemory()}
+                    disabled={!selectedStoryMemory || isGeneratingConcept}
+                    className="inline-flex items-center gap-2 rounded-xl border border-[rgba(232,193,106,0.24)] bg-[rgba(42,28,6,0.72)] px-3 py-3 font-mono text-[10px] font-semibold text-[#ffd980] transition hover:bg-[rgba(58,38,8,0.82)] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {isGeneratingConcept ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                    Fortsetzen
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {selectedStoryMemory && (
+              <div className="rounded-[14px] border border-[rgba(114,228,255,0.1)] bg-[rgba(3,8,18,0.72)] px-3 py-3 font-mono text-[10px] leading-relaxed text-[#8ea6c3]">
+                <span className="text-[#72e4ff]">Aktive Memory:</span> {selectedStoryMemory.storyConcept || selectedStoryMemory.sourcePrompt || selectedStoryMemory.title}
+                {selectedStoryMemory.referenceStyle?.summary ? <> · <span className="text-[#ffd980]">Style:</span> {selectedStoryMemory.referenceStyle.summary}</> : null}
+              </div>
+            )}
+
+            {storyMemoryMessage && (
+              <div className={`rounded-lg border px-4 py-3 font-mono text-[10px] leading-relaxed ${/fehl|failed|error/i.test(storyMemoryMessage)
+                ? 'border-[rgba(255,80,60,0.2)] bg-[rgba(255,80,60,0.1)] text-[#ff6a4f]'
+                : 'border-[rgba(114,228,255,0.14)] bg-[rgba(10,26,46,0.56)] text-[#72e4ff]'}`}>
+                {storyMemoryMessage}
+              </div>
+            )}
+          </div>
+
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(340px,0.95fr)]">
+            <div className="space-y-4">
+              <label className="block space-y-2">
+                <span className="block font-mono text-[11px] uppercase tracking-[0.22em] text-[#ffd980]">Simple Prompt</span>
+                <textarea
+                  ref={inputRef}
+                  value={concept}
+                  onChange={(event) => setConcept(event.target.value)}
+                  rows={4}
+                  placeholder="z. B. eine schwarze Maschine atmet im Takt, cyan Staub, ruhige Kamera, techno archive energy"
+                  className="w-full resize-none rounded-xl border border-[rgba(232,193,106,0.2)] bg-[rgba(5,10,18,0.86)] px-4 py-3 font-mono text-sm text-[#fff4d0] placeholder-[#6f5a2f] outline-none transition focus:border-[rgba(255,217,128,0.55)] focus:ring-1 focus:ring-[rgba(255,217,128,0.2)]"
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && !event.shiftKey) {
+                      event.preventDefault();
+                      void handleManualDemoGenerateScenes();
+                    }
+                  }}
+                />
+              </label>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => void handleManualDemoGenerateScenes()}
+                  disabled={isGeneratingConcept || isPreparingReferences || (!concept.trim() && referenceImages.length === 0)}
+                  className="flex items-center gap-2 rounded-xl border border-[rgba(232,193,106,0.34)] bg-[rgba(58,38,8,0.82)] px-5 py-3 font-mono text-xs font-semibold text-[#ffd980] transition hover:bg-[rgba(74,48,10,0.9)] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {isGeneratingConcept ? (
+                    <><Loader2 size={14} className="animate-spin" />Szenen werden geschrieben…</>
+                  ) : (
+                    <><Sparkles size={14} />4 Szenenprompts schreiben</>
+                  )}
+                </button>
+                {scenes.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleVideoAll}
+                    disabled={isRenderingAllVideos || hasActiveVideoRender || scenes.every((scene) => !scene.prompt.trim())}
+                    className="flex items-center gap-2 rounded-xl border border-[rgba(114,228,255,0.18)] bg-[rgba(10,32,46,0.72)] px-5 py-3 font-mono text-xs font-semibold text-[#72e4ff] transition hover:bg-[rgba(16,46,66,0.82)] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {isRenderingAllVideos ? <><Loader2 size={14} className="animate-spin" />GIF {Math.max(activeVideoBatchIndex, 0) + 1} / {scenes.length}…</> : <><Film size={14} />Alle 4 GIFs rendern</>}
+                  </button>
+                )}
+              </div>
+
+              {conceptError && (
+                <div className="flex items-start gap-2 rounded-lg border border-[rgba(255,80,60,0.2)] bg-[rgba(255,80,60,0.1)] px-4 py-3 text-xs text-[#ff6a4f]">
+                  <TriangleAlert size={14} className="mt-0.5 shrink-0" />
+                  {conceptError}
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-[18px] border border-[rgba(232,193,106,0.16)] bg-[rgba(10,12,20,0.78)] p-4 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-[#ffd980]">Style Extraction Upload</div>
+                  <div className="mt-1 font-mono text-[10px] text-[#8a6a30]">PNG / GIF · {referenceImages.length}/{MAX_REFERENCE_IMAGES}</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => referenceInputRef.current?.click()}
+                  disabled={isPreparingReferences || referenceImages.length >= MAX_REFERENCE_IMAGES}
+                  className="inline-flex items-center gap-2 rounded-xl border border-[rgba(232,193,106,0.22)] bg-[rgba(42,28,6,0.72)] px-4 py-2 font-mono text-[11px] font-semibold text-[#ffd980] transition hover:bg-[rgba(58,38,8,0.82)] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {isPreparingReferences ? <Loader2 size={13} className="animate-spin" /> : <ImagePlus size={13} />}
+                  Stilbilder hochladen
+                </button>
+              </div>
+
+              <input
+                ref={referenceInputRef}
+                type="file"
+                accept="image/png,image/gif"
+                multiple
+                className="hidden"
+                onChange={handleReferenceFilesSelected}
+              />
+
+              {referenceImages.length > 0 ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {referenceImages.map((referenceImage) => (
+                    <article key={referenceImage.id} className="overflow-hidden rounded-[16px] border border-[rgba(232,193,106,0.12)] bg-[rgba(4,8,16,0.78)]">
+                      <div className="aspect-video overflow-hidden border-b border-[rgba(232,193,106,0.08)] bg-[#02040e]">
+                        <img src={referenceImage.previewDataUrl} alt={referenceImage.name} className="h-full w-full object-cover" />
+                      </div>
+                      <div className="space-y-2 px-3 py-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="truncate font-mono text-[11px] text-[#fff4d0]">{referenceImage.name}</div>
+                            <div className="font-mono text-[10px] text-[#8a6a30]">{referenceImage.source.toUpperCase()} · {referenceImage.width}×{referenceImage.height}</div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveReferenceImage(referenceImage.id)}
+                            className="rounded-full border border-[rgba(232,193,106,0.14)] p-1 text-[#8a6a30] transition hover:border-[rgba(232,193,106,0.3)] hover:text-[#fff4d0]"
+                            aria-label={`${referenceImage.name} entfernen`}
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-[16px] border border-dashed border-[rgba(232,193,106,0.14)] bg-[rgba(4,8,16,0.52)] px-4 py-8 text-center font-mono text-[11px] text-[#8a6a30]">
+                  Kein Stilbild geladen · Prompt allein reicht, Referenzen machen die Szenen-DNA konkreter.
+                </div>
+              )}
+
+              {referenceStyle && (
+                <div className="rounded-[14px] border border-[rgba(114,228,255,0.12)] bg-[rgba(4,14,26,0.68)] px-3 py-3 font-mono text-[10px] leading-relaxed text-[#8ea6c3]">
+                  <span className="text-[#72e4ff]">Extrahierte Style-DNA:</span> {referenceStyle.summary || referenceStyle.promptDNA || referenceStyle.palette}
+                </div>
+              )}
+
+              {referenceError && (
+                <div className="flex items-start gap-2 rounded-lg border border-[rgba(255,80,60,0.2)] bg-[rgba(255,80,60,0.1)] px-4 py-3 text-xs text-[#ff6a4f]">
+                  <TriangleAlert size={14} className="mt-0.5 shrink-0" />
+                  {referenceError}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {scenes.length > 0 && (
+            <div className="rounded-[16px] border border-[rgba(141,240,180,0.18)] bg-[rgba(10,40,24,0.08)] px-4 py-3 text-xs leading-relaxed text-[#8df0b4]">
+              <CheckCircle2 size={14} className="mr-2 inline-block align-[-2px]" />
+              Vier Szenenprompts sind geschrieben. Du kannst sie unten editieren, als GIFs rendern oder direkt als ZIP mit Story-Metadaten exportieren.
             </div>
           )}
         </section>
@@ -2971,6 +3611,15 @@ export default function StillframeHarness({
                   <><Film size={13} />{outputMode === 'satire' ? 'Alle 4 Satire-GIFs rendern' : 'Alle 4 GIFs rendern'}</>
                 )}
               </button>
+              <button
+                type="button"
+                onClick={() => void handleDownloadStoryZip()}
+                disabled={isDownloadingStoryZip}
+                className="flex items-center gap-2 rounded-xl border border-[rgba(232,193,106,0.22)] bg-[rgba(42,28,6,0.7)] px-4 py-2 font-mono text-[11px] font-semibold text-[#ffd980] transition hover:bg-[rgba(58,38,8,0.8)] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {isDownloadingStoryZip ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+                Szenen-ZIP
+              </button>
               <span className="font-mono text-[10px] text-[#2a4060]">
                 {outputMode === 'satire'
                   ? 'Polish, Skizzen und GIFs laufen nacheinander durch denselben Vier-Beat-Satirebogen.'
@@ -3008,6 +3657,8 @@ export default function StillframeHarness({
             <p className="font-mono text-sm text-[#2a4060]">
               {studioView === 'demo'
                 ? <>Starte oben den <span className="text-[#4a7090]">Demo-Lauf</span>, um vier loopbare GIF-Szenen für die nächste Stream-Dia-Show zu produzieren – oder wechsle in die <button type="button" onClick={() => setStudioView('werkstatt')} className="text-[#c7a7ff] underline decoration-dotted underline-offset-2 transition hover:text-[#e6d6ff]">Werkstatt</button> fuer Modus, Ideen-Generator und manuelles Scene Composing.</>
+                : studioView === 'manual-demo'
+                  ? <>Gib oben einen <span className="text-[#8a6a30]">Simple Prompt</span> ein, lade optional Stilbilder hoch und schreibe daraus automatisch vier editierbare Szenenprompts.</>
                 : generationMode === 'satire'
                   ? <>Waehle eine Voreinstellung, optional Referenzbilder und einen Satire-Fokus, und starte oben <span className="text-[#4a7090]">Satire Sketch + 4 Beats</span></>
                   : <>Gib ein Konzept, 3 bis 5 Keywords oder Referenzbilder oben ein und klicke auf <span className="text-[#4a7090]">Generate Story Beats</span></>}

@@ -154,6 +154,11 @@ const LOCAL_KB_TEXT_FILES = [
   'README.md',
 ] as const;
 
+const LOCAL_KB_TEXT_DIRS = [
+  'memories/stillframe-stories',
+  'memories/thumbnail-studio',
+] as const;
+
 const LOCAL_KB_ASSET_DIRS = [
   'ARV',
   path.join('ARV', 'GRAFFITTI'),
@@ -264,6 +269,33 @@ const safeReadText = async (relativePath: string): Promise<IQKnowledgeChunk[]> =
   }
 };
 
+const walkTextDirectory = async (absoluteDir: string, sourcePrefix: string): Promise<IQKnowledgeChunk[]> => {
+  try {
+    const entries = await fs.readdir(absoluteDir, { withFileTypes: true });
+    const chunks: IQKnowledgeChunk[] = [];
+
+    for (const entry of entries) {
+      const nextAbsolute = path.join(absoluteDir, entry.name);
+      const nextSource = path.posix.join(sourcePrefix, entry.name);
+
+      if (entry.isDirectory()) {
+        chunks.push(...await walkTextDirectory(nextAbsolute, nextSource));
+        continue;
+      }
+
+      if (!/\.(md|txt)$/i.test(entry.name)) {
+        continue;
+      }
+
+      chunks.push(...await safeReadText(nextSource));
+    }
+
+    return chunks;
+  } catch {
+    return [];
+  }
+};
+
 const sanitizeAssetName = (value: string): string =>
   value
     .replace(/\.[^.]+$/, '')
@@ -310,11 +342,18 @@ const walkAssetDirectory = async (absoluteDir: string, sourcePrefix: string): Pr
 
 const loadLocalKnowledge = async (): Promise<IQKnowledgeChunk[]> => {
   const textChunks = await Promise.all(LOCAL_KB_TEXT_FILES.map((file) => safeReadText(file)));
+  const dynamicTextChunks = await Promise.all(
+    LOCAL_KB_TEXT_DIRS.map((relativeDir) => walkTextDirectory(path.join(process.cwd(), relativeDir), relativeDir.split(path.sep).join('/'))),
+  );
   const assetChunks = await Promise.all(
     LOCAL_KB_ASSET_DIRS.map((relativeDir) => walkAssetDirectory(path.join(process.cwd(), relativeDir), relativeDir.split(path.sep).join('/'))),
   );
 
-  return [...textChunks.flat(), ...assetChunks.flat()];
+  return [...textChunks.flat(), ...dynamicTextChunks.flat(), ...assetChunks.flat()];
+};
+
+export const invalidateLocalKnowledgeCache = (): void => {
+  localKnowledgePromise = null;
 };
 
 const getLocalKnowledge = (): Promise<IQKnowledgeChunk[]> => {
