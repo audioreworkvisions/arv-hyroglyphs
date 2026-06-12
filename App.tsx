@@ -12,8 +12,6 @@ const Library = lazy(() => import('./components/Library'));
 const StillframeHarness = lazy(() => import('./components/StillframeHarness'));
 const ThumbnailStudio = lazy(() => import('./components/ThumbnailStudio'));
 const AzureUsagePanel = lazy(() => import('./components/AzureUsagePanel'));
-const RandomGifGenerator = lazy(() => import('./components/arv-live/RandomGifGenerator'));
-const RandomVideoGenerator = lazy(() => import('./components/arv-live/RandomVideoGenerator'));
 
 interface BrowserLocationState {
   pathname: string;
@@ -258,14 +256,6 @@ export default function App() {
           <AzureUsagePanel entries={azureUsageEntries} totals={azureUsageTotals} onClear={clearAzureUsage} />
         </Suspense>
       )}
-
-      <Suspense fallback={null}>
-        <RandomGifGenerator />
-      </Suspense>
-
-      <Suspense fallback={null}>
-        <RandomVideoGenerator />
-      </Suspense>
     </>
   );
 }

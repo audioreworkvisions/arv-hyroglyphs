@@ -1,8 +1,8 @@
 # Hyroglyphs
 
-![Hyroglyphs banner](https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6)
+![Hyroglyphs banner](repo-banner.png)
 
-**Story-first creative AI studio for surreal worlds, ritual stillframes, storyboard-driven motion, and remixable or extendable video loops.**
+**Story-first creative AI studio that produces the visual layer for the techno music channel [@audioreworkvisions](https://www.youtube.com/@audioreworkvisions): loopable AI-generated GIF scenes that run as a GIF slideshow — the image/video source for music videos and techno livestreams — plus matching thumbnails and YouTube metadata.**
 
 Prepared as a submission candidate for the Microsoft Agents League Contest @ AI Skills Fest 2026 under the Creative Apps track.
 
@@ -32,25 +32,65 @@ Demo video link: Add your final public YouTube or Vimeo URL here before submitti
 
 ## What Hyroglyphs Is
 
-Hyroglyphs is a creative application for building visual worlds in a story-first way. Instead of treating prompt generation, visual direction, and motion as separate tasks, it keeps them in one iterative studio loop:
+Hyroglyphs is the production tool behind the YouTube channel **@audioreworkvisions**. Every techno release and livestream on the channel needs a visual layer — and instead of filming or hand-animating it, Hyroglyphs generates it: four-beat stories rendered as loopable GIF scenes that play as a **GIF slideshow**, simulating and representing the finished music video. The finished GIFs are used directly as the image/video source in music videos and techno livestreams.
 
-1. Generate or refine story concepts.
+The workflow is story-first instead of one-off prompting:
+
+1. Generate or refine story concepts (or run the one-click demo pipeline).
 2. Break them into structured scenes.
-3. Ground the creative intent with Foundry IQ or curated local knowledge.
+3. Ground the creative intent with Foundry IQ or curated local knowledge, so every visual stays on-brand for the channel.
 4. Turn scenes into stillframes, sketches, GIF loops, or video clips.
 5. Keep iterating through remix and extension flows instead of restarting from scratch.
+6. Finish the release in the **ARV Thumbnail Studio**: thumbnail, title, description, hashtags, and SEO keywords for the video — generated with Foundry models and grounded by Foundry IQ.
 
 The project is centered on the ARV aesthetic language: dark analog archive textures, sparse compositions, controlled motion, and loop-ready visual payoffs.
 
 ## Why This Fits the Creative Apps Track
 
-Hyroglyphs is positioned for the Creative Apps track because it is a creator-facing product, not just a backend demo:
+Hyroglyphs is positioned for the Creative Apps track because it is a creator-facing product with a real production use case, not just a backend demo:
 
+- It powers an actual publishing pipeline: the GIF slideshows it produces are the visual source for music videos and techno livestreams on @audioreworkvisions.
 - It supports ideation, art direction, prompt shaping, rendering, and iteration in one interface.
 - It turns multi-step AI orchestration into something visual and demoable in minutes.
-- It uses Microsoft IQ as a real creative intelligence layer instead of a decorative add-on.
+- It uses Microsoft IQ as a real creative intelligence layer — a brand memory that keeps every generated visual consistent with the channel's ARV aesthetic.
 - It exposes remix and extension workflows that feel native to artists, motion designers, and creative technologists.
-- It is designed to be judged as a polished application experience, not only as an API experiment.
+- It closes the loop from visuals to publishing: the Thumbnail Studio generates the matching thumbnail, title, description, hashtags, and SEO keywords for each video.
+
+## One-Click Hackathon Demo Run
+
+The Stillframe Studio opens in a focused **Demo Flow** view (the manual tooling — mode selection, idea generator, scene composing — lives in a separate **Werkstatt** view, toggled in the header). At the top sits the **Agents League · One-Click Demo** panel. A single click runs the full production pipeline end to end — from concept to a broadcast-ready GIF slideshow — and makes the Foundry IQ integration visible while it happens:
+
+1. **Story concept + 4 beats** — Foundry models generate a complete stillframe story (title, concept, style presets, four scene prompts) in the active mode (Ritual, Satire, or Signal Geometry). If no input is provided, a curated demo seed is used so the demo always starts reliably.
+2. **Foundry IQ grounding per scene** — Every scene render is enriched through agentic knowledge retrieval against the ARV style pack (Azure AI Search knowledge base, with curated local knowledge as fallback), keeping each visual on-brand for the channel.
+3. **4 finished video/GIF scenes** — All four scenes are rendered sequentially via Sora and automatically converted into loopable GIFs. Together they form the GIF slideshow that runs as the image/video source in the next music video or techno livestream.
+
+While the run executes, a live pipeline strip shows each stage (Story-Konzept → Szene 1–4 · Sora → GIF), and the **Live Pipeline Log** streams every step in real time: IQ grounding provider and citation counts, final model prompts, Sora video IDs, GIF conversion, and any errors. Once scenes are grounded, the **Foundry IQ Grounding** spotlight panel above the scene cards shows:
+
+- whether the remote **Foundry IQ Agent** or the **local knowledge fallback** answered,
+- how many scenes were grounded and how many sources were cited,
+- the actual citations (source + excerpt) that shaped each render.
+
+This makes the required Microsoft IQ layer demonstrable in seconds: the judge sees the knowledge retrieval, the citations, and their effect on the final prompts (full detail per scene in the Prompt-Debug panel of each scene card).
+
+### Suggested 5-minute demo script
+
+1. Open the Stillframe Studio (default route `/`) — it starts in the focused **Demo Flow** view and explains the use case: producing the visual layer for @audioreworkvisions.
+2. Optionally type a concept — or leave everything empty to use the curated demo seed.
+3. Click **Demo-Lauf starten** and narrate the pipeline strip and the **Live Pipeline Log** while they progress.
+4. When the first scene completes, open the **Foundry IQ Grounding** panel and show provider + citations.
+5. Expand one scene card's **Prompt-Debug** to show raw prompt → IQ brief → final model prompt.
+6. Show the four finished GIF loops — the slideshow that will run in the next music video or livestream — and download one.
+7. Switch to `/thumbnail-studio` and generate the matching thumbnail, title, description, hashtags, and SEO keywords for the video.
+
+## GitHub Copilot Usage
+
+GitHub Copilot (agent mode in VS Code) was used meaningfully throughout development:
+
+- **Architecture and orchestration** — The one-click demo pipeline (story generation → IQ grounding → sequential Sora renders → GIF conversion) was planned and implemented with Copilot agent mode across `components/StillframeHarness.tsx` and the Express routes.
+- **Multi-file refactors** — Copilot handled coordinated changes such as threading the generated story context through the render path to avoid stale React state during automated runs.
+- **Foundry IQ wiring** — The IQ brief resolution (`server/utils/iq.ts`), Entra/AAD token handling, and the local knowledge fallback were iterated with Copilot chat for debugging auth and response parsing.
+- **Prompt engineering helpers** — Copilot assisted in building the prompt-hardening templates and the four-beat dramaturgy rules in `lib/promptTemplates.ts` and the ARV style pack documents.
+- **Validation loops** — Builds (`npm run build`), type checks, and error fixes were run and resolved directly through Copilot's agent workflow.
 
 ## Core Product Experience
 
@@ -60,10 +100,12 @@ The main studio surface focuses on creative sequencing rather than one-off promp
 
 ### 2. Stillframe Rituals
 
-Stillframe Rituals is a focused creation surface for four-beat visual loops. It supports:
+Stillframe Rituals is a focused creation surface for four-beat visual loops — the GIF scenes that make up a slideshow. It supports:
 
+- one-click demo run (full story + 4 GIF scenes, see above)
 - idea generation
 - prompt polishing
+- batch polish / sketch / render across all four beats
 - sketch generation
 - video-to-GIF conversion
 - video remix
@@ -88,7 +130,7 @@ That context is turned into a grounded prompt brief before rendering, helping ma
 
 ### 5. Library and export surface
 
-Generated ideas, GIFs, and story outputs can be stored in the in-browser library for replay, export, and follow-up iterations.
+Generated ideas, GIFs, and story outputs can be stored in the in-browser library for replay, export, and follow-up iterations — the staging area for assembling slideshow material for upcoming releases and streams.
 
 ### 6. Azure usage visibility
 

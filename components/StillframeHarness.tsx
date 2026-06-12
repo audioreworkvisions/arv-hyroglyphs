@@ -1,22 +1,28 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
 import {
   BookOpen,
   Camera,
   ChevronsDown,
   CheckCircle2,
   Copy,
+  Database,
   Download,
   Film,
   ImagePlus,
   Loader2,
+  Play,
   RefreshCw,
   Sparkles,
   Tags,
+  Terminal,
   TriangleAlert,
   X,
 } from 'lucide-react';
 import StoryMode from './StoryMode';
 import type { ARVSatireSketch, ARVStorySequence } from '../lib/arvTypes';
+
+const RandomGifGenerator = lazy(() => import('./arv-live/RandomGifGenerator'));
+const RandomVideoGenerator = lazy(() => import('./arv-live/RandomVideoGenerator'));
 import { arvMinimalSignalGeometryPreset } from '../lib/minimalSignalGeometryPreset';
 import { PROMPT_TEMPLATES } from '../lib/promptTemplates';
 import {
@@ -151,6 +157,35 @@ interface StillframeIdeaRemixPayload {
 
 type StillframeIdeaListKey = 'themes' | 'characters' | 'events' | 'actions' | 'stories' | 'styles' | 'promptSeeds' | 'presetSeeds';
 
+type DemoStageId = 'concept' | 'scene-1' | 'scene-2' | 'scene-3' | 'scene-4';
+type DemoStageStatus = 'pending' | 'active' | 'done' | 'error';
+
+interface DemoRunState {
+  status: 'idle' | 'running' | 'done' | 'error';
+  stages: Record<DemoStageId, DemoStageStatus>;
+  error: string | null;
+  startedAt: number | null;
+  finishedAt: number | null;
+}
+
+interface StillframeGeneratedContext {
+  storyTitle: string | null;
+  storyConcept: string | null;
+  stylePresets: StillframeStylePresetSummary[];
+  referenceStyle: StillframeReferenceStyleSummary | null;
+}
+
+type StudioView = 'demo' | 'werkstatt';
+
+type PipelineLogLevel = 'info' | 'detail' | 'success' | 'error';
+
+interface PipelineLogEntry {
+  id: number;
+  time: number;
+  level: PipelineLogLevel;
+  text: string;
+}
+
 // ── Constants ────────────────────────────────────────────────────────────────
 
 const BEAT_LABELS: Record<BeatType, string> = {
@@ -181,6 +216,43 @@ const PLACEHOLDER_CONCEPTS = [
   'A kinetic structure folding light through dust and residue',
   'A synthetic organism drifting through a restrained industrial void',
 ];
+
+const DEMO_STAGE_IDS: DemoStageId[] = ['concept', 'scene-1', 'scene-2', 'scene-3', 'scene-4'];
+
+const DEMO_STAGE_LABELS: Record<DemoStageId, string> = {
+  concept: 'Story-Konzept + 4 Beats',
+  'scene-1': 'Szene 1 · Sora → GIF',
+  'scene-2': 'Szene 2 · Sora → GIF',
+  'scene-3': 'Szene 3 · Sora → GIF',
+  'scene-4': 'Szene 4 · Sora → GIF',
+};
+
+const createIdleDemoStages = (): Record<DemoStageId, DemoStageStatus> => ({
+  concept: 'pending',
+  'scene-1': 'pending',
+  'scene-2': 'pending',
+  'scene-3': 'pending',
+  'scene-4': 'pending',
+});
+
+const IDLE_DEMO_RUN: DemoRunState = {
+  status: 'idle',
+  stages: createIdleDemoStages(),
+  error: null,
+  startedAt: null,
+  finishedAt: null,
+};
+
+const DEMO_SEEDS: Record<GenerationMode, string> = {
+  ritual: 'A suspended glass signal engine breathing over a dark hangar floor, archive dust drifting through cyan scan light, one slow mechanical exhale per loop',
+  satire: 'A pressure-core open-plan ritual where a polite glass machine quietly malfunctions during its own performance review',
+  signal: 'black CRT field, one acid-cyan spiral tightening into a single dot, scanner sweep with afterimage residue',
+};
+
+const truncateForLog = (text: string, max = 160): string => {
+  const clean = text.replace(/\s+/g, ' ').trim();
+  return clean.length > max ? `${clean.slice(0, max - 1)}…` : clean;
+};
 
 // Group templates by category for the dropdown
 const TEMPLATE_OPTIONS = PROMPT_TEMPLATES.reduce<{ category: string; options: { id: string; label: string; prompt: string }[] }[]>(
@@ -223,9 +295,9 @@ const GENERATION_MODE_STATUS_LABELS: Record<GenerationMode, string> = {
 };
 
 const GENERATION_MODE_DESCRIPTIONS: Record<GenerationMode, string> = {
-  ritual: 'Hypnotic micro-motion stop-frame loops via Azure OpenAI Foundry. Gib 3 bis 5 Schlagwoerter, ein freies Konzept oder Referenzbilder an, lass dir passende Stil-Presets und 4 diverse Szenen-Prompts bauen und rendere daraus GIF-Loops.',
-  satire: 'Einfacher ARV-Satiremodus mit zwei Figuren, einem optionalen Satire-Fokus und direkt generierten Sketch- plus GIF-Szenen.',
-  signal: 'Minimalistische CRT-Signalgeometrie auf schwarzem Grund: Motif und Motion-Event waehlen, daraus 4 abstrakte Loop-Szenen mit duennen Linien, Scanlines und sauberem Signal-Payoff bauen.',
+  ritual: 'Hypnotic micro-motion stop-frame loops via Azure OpenAI Foundry. Gib 3 bis 5 Schlagwoerter, ein freies Konzept oder Referenzbilder an, lass dir passende Stil-Presets und 4 diverse Szenen-Prompts bauen und rendere daraus GIF-Loops fuer die naechste Stream-Dia-Show.',
+  satire: 'Einfacher ARV-Satiremodus mit zwei Figuren, einem optionalen Satire-Fokus und direkt generierten Sketch- plus GIF-Szenen – als humorvolle Visual-Ebene zwischen den Techno-Loops.',
+  signal: 'Minimalistische CRT-Signalgeometrie auf schwarzem Grund: Motif und Motion-Event waehlen, daraus 4 abstrakte Loop-Szenen mit duennen Linien, Scanlines und sauberem Signal-Payoff bauen – ideal als reduzierte Visuals fuer dunkle Techno-Sets.',
 };
 
 const IDEA_SECTION_CONFIG: Array<{ key: StillframeIdeaListKey; label: string; useTarget?: 'ritual' | 'satire' | 'signal' | 'both' | 'all' }> = [
@@ -254,8 +326,8 @@ const mergeKeywords = (currentKeywords: string[], draftValue: string): string[] 
 const buildStillframeIQContext = (
   scenes: SceneState[],
   index: number,
-  storyTitle: string,
-  storyConcept: string,
+  storyTitle: string | null,
+  storyConcept: string | null,
   referenceStyle: StillframeReferenceStyleSummary | null,
   stylePresets: StillframeStylePresetSummary[],
   remixVideoId?: string | null,
@@ -272,8 +344,8 @@ const buildStillframeIQContext = (
     sceneBeat: scene?.beat,
     action: scene?.prompt,
     motion: scene?.motion,
-    storyTitle: storyTitle.trim() || undefined,
-    storyConcept: storyConcept.trim() || undefined,
+    storyTitle: storyTitle?.trim() || undefined,
+    storyConcept: storyConcept?.trim() || undefined,
     referenceStyleSummary: referenceStyle?.summary ?? null,
     referenceStylePalette: referenceStyle?.palette ?? null,
     referenceStyleMotion: referenceStyle?.motion ?? null,
@@ -507,6 +579,9 @@ export default function StillframeHarness({
   const [isPolishingAll, setIsPolishingAll] = useState(false);
   const [isSketchingAll, setIsSketchingAll] = useState(false);
   const [isRenderingAllVideos, setIsRenderingAllVideos] = useState(false);
+  const [demoRun, setDemoRun] = useState<DemoRunState>(IDLE_DEMO_RUN);
+  const [studioView, setStudioView] = useState<StudioView>('demo');
+  const [pipelineLog, setPipelineLog] = useState<PipelineLogEntry[]>([]);
   const [isPreparingReferences, setIsPreparingReferences] = useState(false);
   const [conceptError, setConceptError] = useState<string | null>(null);
   const [referenceError, setReferenceError] = useState<string | null>(null);
@@ -529,6 +604,8 @@ export default function StillframeHarness({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const referenceInputRef = useRef<HTMLInputElement>(null);
   const didBootstrapIdeaRemixRef = useRef(false);
+  const pipelineLogIdRef = useRef(0);
+  const pipelineLogScrollRef = useRef<HTMLDivElement | null>(null);
 
   const placeholderIndex = useRef(Math.floor(Math.random() * PLACEHOLDER_CONCEPTS.length));
   const pendingKeywords = mergeKeywords(keywords, keywordInput);
@@ -560,6 +637,17 @@ export default function StillframeHarness({
   useEffect(() => () => {
     scenesRef.current.forEach((scene) => revokeObjectUrl(scene.gifData));
   }, []);
+
+  const pushPipelineLog = useCallback((level: PipelineLogLevel, text: string) => {
+    pipelineLogIdRef.current += 1;
+    const entry: PipelineLogEntry = { id: pipelineLogIdRef.current, time: Date.now(), level, text };
+    setPipelineLog((prev) => (prev.length >= 120 ? [...prev.slice(prev.length - 119), entry] : [...prev, entry]));
+  }, []);
+
+  useEffect(() => {
+    const el = pipelineLogScrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [pipelineLog]);
 
   const flushKeywordInput = () => {
     if (!keywordInput.trim()) {
@@ -922,7 +1010,7 @@ export default function StillframeHarness({
 
     if (!trimmedConcept && preparedKeywords.length < MIN_KEYWORDS && referenceImages.length === 0) {
       setConceptError(`Bitte mindestens ${MIN_KEYWORDS} Schlagwoerter, ein Referenzbild oder einen freien Concept-Text eingeben.`);
-      return;
+      return null;
     }
 
     setIsGeneratingConcept(true);
@@ -946,32 +1034,42 @@ export default function StillframeHarness({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Concept generation failed.');
 
-      setStoryTitle(data.storyTitle || null);
-      setStoryConcept(data.storyConcept || null);
+      const generatedContext: StillframeGeneratedContext = {
+        storyTitle: data.storyTitle || null,
+        storyConcept: data.storyConcept || null,
+        stylePresets: Array.isArray(data.stylePresets) ? data.stylePresets : [],
+        referenceStyle: data.referenceStyle || null,
+      };
+
+      setStoryTitle(generatedContext.storyTitle);
+      setStoryConcept(generatedContext.storyConcept);
       setSubject(data.subject);
       setMicroMotion(data.microMotion);
       setKeywords(Array.isArray(data.keywords) ? data.keywords : preparedKeywords);
-      setStylePresets(Array.isArray(data.stylePresets) ? data.stylePresets : []);
-      setReferenceStyle(data.referenceStyle || null);
+      setStylePresets(generatedContext.stylePresets);
+      setReferenceStyle(generatedContext.referenceStyle);
       applyUsageSummary(data.usage);
       const initialized = initScenes(data.scenes);
       scenesRef.current = initialized;
       setScenes(initialized);
       setOutputMode('ritual');
+      return generatedContext;
     } catch (err: any) {
       if (referenceStyleOverride) {
         setReferenceStyle(referenceStyleOverride);
       }
       setConceptError(err.message || 'Concept generation failed.');
+      pushPipelineLog('error', `Story-Konzept fehlgeschlagen: ${err.message || 'Concept generation failed.'}`);
+      return null;
     } finally {
       setIsGeneratingConcept(false);
     }
-  }, [applyUsageSummary, buildReferenceStyleOverride, referenceImages.length, resetGeneratedOutput, serializeReferenceImages]);
+  }, [applyUsageSummary, buildReferenceStyleOverride, pushPipelineLog, referenceImages.length, resetGeneratedOutput, serializeReferenceImages]);
 
   const runGenerateSatire = useCallback(async (satireSeed: string) => {
     if (!canGenerateSatire) {
       setConceptError('Bitte eine gueltige Satire-Voreinstellung waehlen.');
-      return;
+      return null;
     }
 
     const referenceStyleOverride = buildReferenceStyleOverride();
@@ -999,30 +1097,40 @@ export default function StillframeHarness({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Satire generation failed.');
 
+      const generatedContext: StillframeGeneratedContext = {
+        storyTitle: data.storyTitle || null,
+        storyConcept: data.storyConcept || null,
+        stylePresets: Array.isArray(data.stylePresets) ? data.stylePresets : [],
+        referenceStyle: data.referenceStyle || null,
+      };
+
       setSatireSketch(data.satireSketch || null);
       setAppliedSatirePresetProfileId(data.presetProfileId || selectedSatirePresetProfile.id);
       setAppliedSatireElementIds(Array.isArray(data.selectedElementIds) ? data.selectedElementIds : satireSelectedElementIds);
-      setStoryTitle(data.storyTitle || null);
-      setStoryConcept(data.storyConcept || null);
+      setStoryTitle(generatedContext.storyTitle);
+      setStoryConcept(generatedContext.storyConcept);
       setSubject(data.subject || null);
       setMicroMotion(data.microMotion || null);
-      setStylePresets(Array.isArray(data.stylePresets) ? data.stylePresets : []);
-      setReferenceStyle(data.referenceStyle || null);
+      setStylePresets(generatedContext.stylePresets);
+      setReferenceStyle(generatedContext.referenceStyle);
       applyUsageSummary(data.usage);
 
       const initialized = initScenes(Array.isArray(data.scenes) ? data.scenes : []);
       scenesRef.current = initialized;
       setScenes(initialized);
       setOutputMode('satire');
+      return generatedContext;
     } catch (err: any) {
       if (referenceStyleOverride) {
         setReferenceStyle(referenceStyleOverride);
       }
       setConceptError(err.message || 'Satire generation failed.');
+      pushPipelineLog('error', `Satire-Story fehlgeschlagen: ${err.message || 'Satire generation failed.'}`);
+      return null;
     } finally {
       setIsGeneratingConcept(false);
     }
-  }, [applyUsageSummary, buildReferenceStyleOverride, canGenerateSatire, resetGeneratedOutput, satireSelectedElementIds, satireSketch, selectedSatirePresetProfile.id, serializeReferenceImages]);
+  }, [applyUsageSummary, buildReferenceStyleOverride, canGenerateSatire, pushPipelineLog, resetGeneratedOutput, satireSelectedElementIds, satireSketch, selectedSatirePresetProfile.id, serializeReferenceImages]);
 
   const handleGenerateConcept = async () => {
     const trimmed = concept.trim();
@@ -1043,7 +1151,7 @@ export default function StillframeHarness({
   const runGenerateSignal = useCallback(async (signalSeed: string, motif = selectedSignalMotif, motionEvent = selectedSignalMotionEvent) => {
     if (!motif || !motionEvent) {
       setConceptError('Bitte ein Signal-Motif und ein Motion-Event waehlen.');
-      return;
+      return null;
     }
 
     const referenceStyleOverride = buildReferenceStyleOverride();
@@ -1070,28 +1178,38 @@ export default function StillframeHarness({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Signal geometry generation failed.');
 
-      setStoryTitle(data.storyTitle || null);
-      setStoryConcept(data.storyConcept || null);
+      const generatedContext: StillframeGeneratedContext = {
+        storyTitle: data.storyTitle || null,
+        storyConcept: data.storyConcept || null,
+        stylePresets: Array.isArray(data.stylePresets) ? data.stylePresets : [],
+        referenceStyle: data.referenceStyle || null,
+      };
+
+      setStoryTitle(generatedContext.storyTitle);
+      setStoryConcept(generatedContext.storyConcept);
       setSubject(data.subject || motif);
       setMicroMotion(data.microMotion || motionEvent);
       setKeywords(Array.isArray(data.keywords) ? data.keywords.slice(0, MAX_KEYWORDS) : ['minimal', 'signal', 'geometry']);
-      setStylePresets(Array.isArray(data.stylePresets) ? data.stylePresets : []);
-      setReferenceStyle(data.referenceStyle || null);
+      setStylePresets(generatedContext.stylePresets);
+      setReferenceStyle(generatedContext.referenceStyle);
       applyUsageSummary(data.usage);
 
       const initialized = initScenes(Array.isArray(data.scenes) ? data.scenes : []);
       scenesRef.current = initialized;
       setScenes(initialized);
       setOutputMode('signal');
+      return generatedContext;
     } catch (err: any) {
       if (referenceStyleOverride) {
         setReferenceStyle(referenceStyleOverride);
       }
       setConceptError(err.message || 'Signal geometry generation failed.');
+      pushPipelineLog('error', `Signal-Geometry-Story fehlgeschlagen: ${err.message || 'Signal geometry generation failed.'}`);
+      return null;
     } finally {
       setIsGeneratingConcept(false);
     }
-  }, [applyUsageSummary, buildReferenceStyleOverride, resetGeneratedOutput, selectedSignalMotif, selectedSignalMotionEvent, serializeReferenceImages]);
+  }, [applyUsageSummary, buildReferenceStyleOverride, pushPipelineLog, resetGeneratedOutput, selectedSignalMotif, selectedSignalMotionEvent, serializeReferenceImages]);
 
   const handleGenerateSignal = async () => {
     await runGenerateSignal(signalPrompt.trim());
@@ -1188,26 +1306,32 @@ export default function StillframeHarness({
   const renderVideoForScene = useCallback(async (
     scenePrompt: string,
     index: number,
-    options: { remixVideoId?: string | null; videoTransform?: VideoTransformMode | null } = {},
+    options: { remixVideoId?: string | null; videoTransform?: VideoTransformMode | null; context?: StillframeGeneratedContext } = {},
   ) => {
     const remixVideoId = options.remixVideoId?.trim() || undefined;
     const videoTransform = resolveVideoTransformMode(remixVideoId, options.videoTransform);
+    const effectiveStoryTitle = options.context ? options.context.storyTitle : storyTitle;
+    const effectiveStoryConcept = options.context ? options.context.storyConcept : storyConcept;
+    const effectiveStylePresets = options.context ? options.context.stylePresets : stylePresets;
+    const effectiveReferenceStyle = options.context ? options.context.referenceStyle : referenceStyle;
+    const renderSeconds = normalizeVideoDurationSeconds(scenesRef.current[index]?.durationSeconds);
+    pushPipelineLog('info', `Szene ${index + 1} · Sora-Render gestartet (${renderSeconds}s${videoTransform ? ` · ${videoTransform === 'extend' ? 'Extension' : 'Remix'}` : ''})`);
     const videoRes = await fetch('/api/stillframe/video', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         prompt: scenePrompt,
-        seconds: normalizeVideoDurationSeconds(scenesRef.current[index]?.durationSeconds),
+        seconds: renderSeconds,
         beatIndex: index,
-        stylePresetIds: stylePresets.map((preset) => preset.id),
-        referenceStyle,
+        stylePresetIds: effectiveStylePresets.map((preset) => preset.id),
+        referenceStyle: effectiveReferenceStyle,
         iqContext: buildStillframeIQContext(
           scenesRef.current,
           index,
-          storyTitle,
-          storyConcept,
-          referenceStyle,
-          stylePresets,
+          effectiveStoryTitle,
+          effectiveStoryConcept,
+          effectiveReferenceStyle,
+          effectiveStylePresets,
           remixVideoId ?? null,
           videoTransform,
         ),
@@ -1215,8 +1339,19 @@ export default function StillframeHarness({
       }),
     });
     const videoData = await videoRes.json();
-    if (!videoRes.ok) throw new Error(videoData.error || 'Video generation failed.');
+    if (!videoRes.ok) {
+      pushPipelineLog('error', `Szene ${index + 1} · Sora-Render fehlgeschlagen: ${videoData.error || 'Video generation failed.'}`);
+      throw new Error(videoData.error || 'Video generation failed.');
+    }
     const resolvedVideoId = videoData.videoId || videoData.jobId || null;
+    const renderDebug = (videoData.debug ?? null) as StillframeRenderPromptDebug | null;
+    if (renderDebug?.iqBrief) {
+      pushPipelineLog('detail', `Szene ${index + 1} · IQ-Grounding: ${renderDebug.iqBrief.usedRemote ? 'Foundry IQ Agent (remote)' : 'Workspace KB (Fallback)'} · ${renderDebug.iqBrief.citations.length} Zitate`);
+    }
+    if (renderDebug?.finalPrompt) {
+      pushPipelineLog('detail', `Szene ${index + 1} · Final Prompt: ${truncateForLog(renderDebug.finalPrompt)}`);
+    }
+    pushPipelineLog('info', `Szene ${index + 1} · Sora-Video fertig${resolvedVideoId ? ` · ${resolvedVideoId}` : ''} → GIF-Konvertierung läuft…`);
 
     updateScene(index, {
       videoStatus: 'converting',
@@ -1236,7 +1371,10 @@ export default function StillframeHarness({
       }),
     });
     const gifData = await gifRes.json();
-    if (!gifRes.ok) throw new Error(gifData.error || 'GIF conversion failed.');
+    if (!gifRes.ok) {
+      pushPipelineLog('error', `Szene ${index + 1} · GIF-Konvertierung fehlgeschlagen: ${gifData.error || 'GIF conversion failed.'}`);
+      throw new Error(gifData.error || 'GIF conversion failed.');
+    }
 
     updateScene(index, {
       videoStatus: 'done',
@@ -1247,7 +1385,8 @@ export default function StillframeHarness({
       gifData: dataUrlToObjectUrl(gifData.gifData),
       renderPromptDebug: videoData.debug || null,
     });
-  }, [referenceStyle, storyConcept, storyTitle, stylePresets, updateScene]);
+    pushPipelineLog('success', `Szene ${index + 1} · GIF-Loop fertig (720p · 16:9)`);
+  }, [pushPipelineLog, referenceStyle, storyConcept, storyTitle, stylePresets, updateScene]);
 
   const handleVideo = async (index: number) => {
     const scene = scenes[index];
@@ -1482,12 +1621,141 @@ export default function StillframeHarness({
     setIsRenderingAllVideos(false);
   };
 
+  // ── One-Click Demo Run (Agents League) ──────────────────────────────
+
+  const handleDemoRun = async () => {
+    if (demoRun.status === 'running' || isGeneratingConcept || isRenderingAllVideos) return;
+
+    setDemoRun({
+      status: 'running',
+      stages: { ...createIdleDemoStages(), concept: 'active' },
+      error: null,
+      startedAt: Date.now(),
+      finishedAt: null,
+    });
+    setPipelineLog([]);
+    pushPipelineLog('info', `Demo-Lauf gestartet · Modus „${GENERATION_MODE_LABELS[generationMode]}“`);
+    pushPipelineLog('info', 'Stufe 1 · Story-Konzept + 4 Beats werden generiert…');
+
+    const patchStage = (stage: DemoStageId, status: DemoStageStatus) => {
+      setDemoRun((prev) => ({ ...prev, stages: { ...prev.stages, [stage]: status } }));
+    };
+
+    // Stufe 1: Story-Konzept + 4 Beats generieren (mit kuratiertem Demo-Seed als Fallback)
+    let generatedContext: StillframeGeneratedContext | null = null;
+    if (generationMode === 'satire') {
+      const satireSeed = satirePrompt.trim() || DEMO_SEEDS.satire;
+      if (!satirePrompt.trim()) setSatirePrompt(satireSeed);
+      generatedContext = await runGenerateSatire(satireSeed);
+    } else if (generationMode === 'signal') {
+      const signalSeed = signalPrompt.trim() || DEMO_SEEDS.signal;
+      if (!signalPrompt.trim()) setSignalPrompt(signalSeed);
+      generatedContext = await runGenerateSignal(signalSeed);
+    } else {
+      const preparedKeywords = keywordInput.trim() ? mergeKeywords(keywords, keywordInput) : keywords;
+      if (keywordInput.trim()) {
+        setKeywords(preparedKeywords);
+        setKeywordInput('');
+      }
+      const hasOwnInput = Boolean(concept.trim()) || preparedKeywords.length >= MIN_KEYWORDS || referenceImages.length > 0;
+      const ritualSeed = concept.trim() || (hasOwnInput ? '' : DEMO_SEEDS.ritual);
+      if (!concept.trim() && ritualSeed) setConcept(ritualSeed);
+      generatedContext = await runGenerateConcept(ritualSeed, preparedKeywords);
+    }
+
+    if (!generatedContext || scenesRef.current.length === 0) {
+      pushPipelineLog('error', 'Story-Generierung fehlgeschlagen – Demo-Lauf gestoppt.');
+      setDemoRun((prev) => ({
+        ...prev,
+        status: 'error',
+        stages: { ...prev.stages, concept: 'error' },
+        error: 'Story-Generierung fehlgeschlagen – Details stehen im Live Pipeline Log.',
+        finishedAt: Date.now(),
+      }));
+      return;
+    }
+    patchStage('concept', 'done');
+    pushPipelineLog('success', `Story-Konzept fertig: „${generatedContext.storyTitle ?? 'ohne Titel'}“ · 4 Beats angelegt`);
+    pushPipelineLog('info', 'Stufe 2 · 4 Szenen werden sequenziell gerendert (IQ-Grounding → Sora → GIF)…');
+
+    // Stufe 2: Alle vier Szenen sequenziell rendern (Foundry IQ Grounding → Sora → GIF)
+    setIsRenderingAllVideos(true);
+    let hadSceneError = false;
+    const sceneCount = Math.min(scenesRef.current.length, 4);
+    for (let i = 0; i < sceneCount; i++) {
+      const stageId = `scene-${i + 1}` as DemoStageId;
+      const scene = scenesRef.current[i];
+      if (!scene?.prompt.trim()) {
+        hadSceneError = true;
+        pushPipelineLog('error', `Szene ${i + 1} · Kein Prompt vorhanden – übersprungen.`);
+        patchStage(stageId, 'error');
+        continue;
+      }
+
+      patchStage(stageId, 'active');
+      updateScene(i, {
+        videoStatus: 'loading',
+        videoBase64: null,
+        gifData: null,
+        errorVideo: null,
+        remixedFromVideoId: null,
+        videoTransformMode: null,
+        renderPromptDebug: null,
+      });
+
+      try {
+        await renderVideoForScene(scenesRef.current[i].prompt, i, { context: generatedContext });
+        patchStage(stageId, 'done');
+      } catch (err: any) {
+        hadSceneError = true;
+        updateScene(i, { videoStatus: 'error', errorVideo: err.message || 'Video/GIF failed.' });
+        patchStage(stageId, 'error');
+      }
+    }
+    setIsRenderingAllVideos(false);
+    pushPipelineLog(hadSceneError ? 'error' : 'success', hadSceneError
+      ? 'Demo-Lauf mit Fehlern beendet – einzelne Szenen können manuell neu gerendert werden.'
+      : 'Demo-Lauf abgeschlossen · Story + 4 GIF-Loops fertig.');
+
+    setDemoRun((prev) => ({
+      ...prev,
+      status: hadSceneError ? 'error' : 'done',
+      error: hadSceneError
+        ? 'Mindestens eine Szene konnte nicht gerendert werden. Einzelne Szenen lassen sich unten manuell neu rendern.'
+        : null,
+      finishedAt: Date.now(),
+    }));
+  };
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   const activePolishBatchIndex = scenes.findIndex((scene) => scene.polishStatus === 'loading');
   const hasActivePolish = scenes.some((scene) => scene.polishStatus === 'loading');
   const activeVideoBatchIndex = scenes.findIndex((scene) => scene.videoStatus === 'loading' || scene.videoStatus === 'converting');
   const hasActiveVideoRender = scenes.some((scene) => scene.videoStatus === 'loading' || scene.videoStatus === 'converting');
+
+  const isDemoRunning = demoRun.status === 'running';
+  const demoSeedWillBeUsed = generationMode === 'satire'
+    ? !satirePrompt.trim()
+    : generationMode === 'signal'
+      ? !signalPrompt.trim()
+      : !concept.trim() && pendingKeywords.length < MIN_KEYWORDS && referenceImages.length === 0;
+
+  const sceneIqEntries = scenes.flatMap((scene, index) => {
+    const brief = scene.renderPromptDebug?.iqBrief;
+    return brief ? [{ index, brief }] : [];
+  });
+  const usedRemoteIq = sceneIqEntries.some((entry) => entry.brief.usedRemote);
+  const iqCitations: Array<{ source: string; excerpt: string }> = [];
+  const seenIqSources = new Set<string>();
+  sceneIqEntries.forEach((entry) => {
+    entry.brief.citations.forEach((citation) => {
+      if (!seenIqSources.has(citation.source)) {
+        seenIqSources.add(citation.source);
+        iqCitations.push(citation);
+      }
+    });
+  });
 
   const scrollToPanel = useCallback((target: 'ideas' | StillframeWorkspace) => {
     const targetRef = target === 'ideas'
@@ -1501,6 +1769,7 @@ export default function StillframeHarness({
 
   const handleWorkspaceChange = (nextWorkspace: StillframeWorkspace) => {
     setActiveWorkspace(nextWorkspace);
+    if (nextWorkspace === 'storyComposer') setStudioView('werkstatt');
     window.requestAnimationFrame(() => scrollToPanel(nextWorkspace));
   };
 
@@ -1517,6 +1786,27 @@ export default function StillframeHarness({
               <div className="font-mono text-[10px] uppercase tracking-[0.24em] text-[#36516e]">Hyroglyphs</div>
               <div className="font-mono text-xs font-semibold text-[#c8ddf0]">Stillframe Studio</div>
             </div>
+          </div>
+
+          <div className="inline-flex rounded-2xl border border-[rgba(114,228,255,0.16)] bg-[rgba(7,14,28,0.82)] p-1">
+            <button
+              type="button"
+              onClick={() => setStudioView('demo')}
+              className={`rounded-xl px-3 py-2 font-mono text-[10px] font-semibold transition ${studioView === 'demo'
+                ? 'border border-[rgba(114,228,255,0.3)] bg-[rgba(18,38,64,0.92)] text-[#72e4ff]'
+                : 'border border-transparent text-[#4a7090] hover:text-[#c8ddf0]'}`}
+            >
+              Demo Flow
+            </button>
+            <button
+              type="button"
+              onClick={() => setStudioView('werkstatt')}
+              className={`rounded-xl px-3 py-2 font-mono text-[10px] font-semibold transition ${studioView === 'werkstatt'
+                ? 'border border-[rgba(168,118,255,0.34)] bg-[rgba(38,20,64,0.92)] text-[#c7a7ff]'
+                : 'border border-transparent text-[#4a7090] hover:text-[#c8ddf0]'}`}
+            >
+              Werkstatt
+            </button>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-[rgba(114,228,255,0.12)] bg-[rgba(7,14,28,0.78)] px-2 py-2">
@@ -1536,7 +1826,10 @@ export default function StillframeHarness({
 
             <button
               type="button"
-              onClick={() => scrollToPanel('ideas')}
+              onClick={() => {
+                setStudioView('werkstatt');
+                window.requestAnimationFrame(() => scrollToPanel('ideas'));
+              }}
               className="rounded-xl border border-[rgba(168,118,255,0.18)] bg-[rgba(30,16,54,0.64)] px-3 py-2 font-mono text-[10px] font-semibold text-[#c7a7ff] transition hover:border-[rgba(168,118,255,0.34)]"
             >
               Ideen
@@ -1594,15 +1887,159 @@ export default function StillframeHarness({
       <main className="mx-auto max-w-[1500px] px-4 py-8 space-y-8">
 
         {/* ── Hero ─────────────────────────────────────────────────────────── */}
-        <div className="space-y-2">
-          <h1 className="font-mono text-2xl font-bold tracking-tight text-[#f3f8ff]">
-            {GENERATION_MODE_LABELS[generationMode]}
-          </h1>
-          <p className="text-sm text-[#4a6a8a] max-w-2xl">
-            {GENERATION_MODE_DESCRIPTIONS[generationMode]}
-          </p>
-        </div>
+        {studioView === 'demo' ? (
+          <div className="space-y-2">
+            <h1 className="font-mono text-2xl font-bold tracking-tight text-[#f3f8ff]">
+              Visual Engine für Audio Rework Visions
+            </h1>
+            <p className="text-sm text-[#4a6a8a] max-w-3xl">
+              Hyroglyphs produziert die Bild-Ebene für Musikvideos und Techno-Livestreams auf dem YouTube-Kanal{' '}
+              <span className="text-[#72e4ff]">@audioreworkvisions</span>: KI-generierte, loopbare GIF-Szenen,
+              die als GIF-Dia-Show das fertige Video simulieren und als Video-Quelle in Streams und Releases laufen –
+              stilistisch verankert in der ARV-Ästhetik über Foundry-IQ-Grounding.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <div className="font-mono text-[11px] uppercase tracking-[0.24em] text-[#8f74c9]">
+              Werkstatt · Manuelle Produktion für @audioreworkvisions
+            </div>
+            <h1 className="font-mono text-2xl font-bold tracking-tight text-[#f3f8ff]">
+              {GENERATION_MODE_LABELS[generationMode]}
+            </h1>
+            <p className="text-sm text-[#4a6a8a] max-w-2xl">
+              {GENERATION_MODE_DESCRIPTIONS[generationMode]}
+            </p>
+          </div>
+        )}
 
+        {/* Agents League · One-Click Demo Run */}
+        {studioView === 'demo' && (
+        <section className="rounded-[24px] border border-[rgba(114,228,255,0.2)] bg-[linear-gradient(135deg,rgba(6,22,42,0.88),rgba(18,10,38,0.88))] p-5 space-y-4 backdrop-blur-sm">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="max-w-3xl space-y-1.5">
+              <div className="font-mono text-[11px] uppercase tracking-[0.24em] text-[#72e4ff]">
+                Agents League · One-Click Demo
+              </div>
+              <h2 className="font-mono text-lg font-semibold text-[#f3f8ff]">
+                Vom Konzept zur sendefertigen GIF-Dia-Show – in einem Lauf
+              </h2>
+              <p className="text-xs leading-relaxed text-[#8ea6c3]">
+                Ein Klick orchestriert die komplette Produktion: Foundry-Modelle schreiben ein Story-Konzept mit vier
+                visuellen Beats, Foundry IQ grounded jede Szene mit Zitaten aus der ARV-Style-Wissensbasis (damit jedes
+                Visual zur Kanal-Ästhetik passt), Sora rendert vier Videos, die automatisch zu loopbaren GIFs konvertiert
+                werden. Die vier GIF-Loops bilden zusammen die Dia-Show, die als Bild-/Video-Quelle im nächsten
+                Musikvideo oder Techno-Livestream läuft – Thumbnail, Titel, Beschreibung, Hashtags und SEO-Keywords
+                dazu liefert anschließend das Thumbnail Studio.
+                {demoSeedWillBeUsed && (
+                  <span className="text-[#72e4ff]">
+                    {' '}Ohne eigene Eingabe startet der Lauf mit einem kuratierten Demo-Seed im Modus „{GENERATION_MODE_LABELS[generationMode]}“.
+                  </span>
+                )}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void handleDemoRun()}
+              disabled={isDemoRunning || isGeneratingConcept || isRenderingAllVideos || hasActiveVideoRender}
+              className="flex items-center gap-2 rounded-xl border border-[rgba(114,228,255,0.4)] bg-[#0e3a5c] px-6 py-3 font-mono text-xs font-semibold text-[#9ff0ff] shadow-[0_0_30px_rgba(114,228,255,0.12)] transition hover:bg-[#155083] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {isDemoRunning ? (
+                <><Loader2 size={15} className="animate-spin" />Demo läuft…</>
+              ) : (
+                <><Play size={15} />Demo-Lauf starten</>
+              )}
+            </button>
+          </div>
+
+          {demoRun.status !== 'idle' && (
+            <div className="flex flex-wrap items-center gap-2">
+              {DEMO_STAGE_IDS.map((stageId) => {
+                const status = demoRun.stages[stageId];
+                const chipClass = status === 'done'
+                  ? 'border-[rgba(141,240,180,0.35)] bg-[rgba(10,40,24,0.6)] text-[#8df0b4]'
+                  : status === 'active'
+                    ? 'border-[rgba(114,228,255,0.4)] bg-[rgba(14,44,70,0.7)] text-[#72e4ff]'
+                    : status === 'error'
+                      ? 'border-[rgba(255,80,60,0.35)] bg-[rgba(60,16,10,0.6)] text-[#ff6a4f]'
+                      : 'border-[rgba(114,228,255,0.1)] bg-[rgba(8,16,30,0.6)] text-[#36516e]';
+                return (
+                  <span key={stageId} className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 font-mono text-[10px] font-semibold ${chipClass}`}>
+                    {status === 'active' && <Loader2 size={11} className="animate-spin" />}
+                    {status === 'done' && <CheckCircle2 size={11} />}
+                    {status === 'error' && <TriangleAlert size={11} />}
+                    {DEMO_STAGE_LABELS[stageId]}
+                  </span>
+                );
+              })}
+              {demoRun.startedAt && demoRun.finishedAt && (
+                <span className="font-mono text-[10px] text-[#4a7090]">
+                  Laufzeit {Math.max(1, Math.round((demoRun.finishedAt - demoRun.startedAt) / 1000))}s
+                </span>
+              )}
+            </div>
+          )}
+
+          {demoRun.error && (
+            <div className="flex items-start gap-2 rounded-lg border border-[rgba(255,80,60,0.2)] bg-[rgba(255,80,60,0.1)] px-4 py-3 text-xs text-[#ff6a4f]">
+              <TriangleAlert size={14} className="mt-0.5 shrink-0" />
+              <span>
+                {demoRun.error}
+                {demoRun.stages.concept === 'error' && conceptError ? ` · ${conceptError}` : ''}
+              </span>
+            </div>
+          )}
+
+          {demoRun.status === 'done' && (
+            <div className="flex items-start gap-2 rounded-lg border border-[rgba(141,240,180,0.2)] bg-[rgba(141,240,180,0.08)] px-4 py-3 text-xs text-[#8df0b4]">
+              <CheckCircle2 size={14} className="mt-0.5 shrink-0" />
+              <span>
+                Produktion abgeschlossen: Story „{storyTitle ?? 'ohne Titel'}“ mit vier GIF-Loops – bereit als Dia-Show
+                für das nächste Musikvideo bzw. den nächsten Livestream auf @audioreworkvisions.
+                Nächster Schritt: Im Thumbnail Studio Thumbnail, Titel, Beschreibung, Hashtags und SEO-Keywords zum Video generieren.
+                Das Foundry-IQ-Grounding jeder Szene ist im IQ-Panel und im Prompt-Debug nachvollziehbar.
+              </span>
+            </div>
+          )}
+
+          {/* Live Pipeline Log */}
+          {pipelineLog.length > 0 && (
+            <div className="rounded-[16px] border border-[rgba(114,228,255,0.14)] bg-[rgba(3,8,18,0.85)] p-3 space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <Terminal size={13} className="text-[#72e4ff]" />
+                <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#72e4ff]">Live Pipeline Log</span>
+                <span className="font-mono text-[10px] text-[#4a7090]">IQ-Grounding · Final Prompts · Sora-Render · GIF-Konvertierung</span>
+                <button
+                  type="button"
+                  onClick={() => setPipelineLog([])}
+                  className="ml-auto rounded-md border border-[rgba(114,228,255,0.12)] px-2 py-1 font-mono text-[9px] font-semibold text-[#4a7090] transition hover:text-[#8ea6c3]"
+                >
+                  Leeren
+                </button>
+              </div>
+              <div ref={pipelineLogScrollRef} className="max-h-60 space-y-1 overflow-y-auto rounded-lg bg-[rgba(2,5,12,0.85)] p-3 font-mono text-[10px] leading-relaxed">
+                {pipelineLog.map((entry) => (
+                  <div
+                    key={entry.id}
+                    className={`flex gap-2 ${entry.level === 'error'
+                      ? 'text-[#ff6a4f]'
+                      : entry.level === 'success'
+                        ? 'text-[#8df0b4]'
+                        : entry.level === 'detail'
+                          ? 'text-[#8f74c9]'
+                          : 'text-[#8ea6c3]'}`}
+                  >
+                    <span className="shrink-0 text-[#36516e]">{new Date(entry.time).toLocaleTimeString('de-DE')}</span>
+                    <span className="min-w-0 break-words">{entry.text}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+        )}
+
+        {studioView === 'werkstatt' && (
         <section ref={ideaSectionRef} className="scroll-mt-24 rounded-[24px] border border-[rgba(168,118,255,0.16)] bg-[linear-gradient(180deg,rgba(22,12,40,0.72),rgba(7,12,24,0.8))] p-5 space-y-5 backdrop-blur-sm">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="space-y-2 max-w-3xl">
@@ -1613,7 +2050,7 @@ export default function StillframeHarness({
                 Neue Visionen fuer Themen, Figuren, Ereignisse, Stories, Styles, Prompt- und Preset-Seeds
               </h2>
               <p className="text-sm leading-relaxed text-[#907aa8]">
-                Generiert immer wieder neue ARV-Ideenpakete, die sofort kopiert oder direkt in Ritual-Concepts und Satire-Fokusfelder uebernommen werden koennen. Vorhandene Keywords und editierte Referenz-DNA wirken als weiche Stilanker mit.
+                Generiert immer wieder neue ARV-Ideenpakete fuer kommende Musikvideos und Livestreams, die sofort kopiert oder direkt in Ritual-Concepts und Satire-Fokusfelder uebernommen werden koennen. Vorhandene Keywords und editierte Referenz-DNA wirken als weiche Stilanker mit, damit jede Idee zur Kanal-Aesthetik passt.
               </p>
             </div>
 
@@ -1740,11 +2177,13 @@ export default function StillframeHarness({
             </div>
           )}
         </section>
+        )}
 
         {/* ── Compose + Storyboard (two-column studio) ─────────────────────── */}
-        <div ref={stillframeSectionRef} className="grid scroll-mt-24 gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] xl:items-start">
+        <div ref={stillframeSectionRef} className={`grid scroll-mt-24 gap-6 ${studioView === 'werkstatt' ? 'xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] xl:items-start' : ''}`}>
 
-        {/* Left column · Compose controls */}
+        {/* Left column · Compose controls (nur Werkstatt) */}
+        {studioView === 'werkstatt' && (
         <div className="space-y-6 xl:sticky xl:top-6">
 
         {/* ── Concept input ─────────────────────────────────────────────────── */}
@@ -2447,6 +2886,7 @@ export default function StillframeHarness({
         </div>
         {/* End left column */}
         </div>
+        )}
 
         {/* Right column · Generated output + storyboard */}
         <div className="space-y-6">
@@ -2454,6 +2894,45 @@ export default function StillframeHarness({
         {/* ── Scene beat cards ──────────────────────────────────────────────── */}
         {scenes.length > 0 && (
           <div className="space-y-5">
+            {/* Foundry IQ Spotlight */}
+            {sceneIqEntries.length > 0 && (
+              <div className="rounded-[20px] border border-[rgba(114,228,255,0.16)] bg-[rgba(6,16,30,0.78)] p-4 space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Database size={14} className="text-[#72e4ff]" />
+                  <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-[#72e4ff]">Foundry IQ Grounding</span>
+                  <span className={`rounded-full border px-2.5 py-0.5 font-mono text-[10px] font-semibold ${usedRemoteIq
+                    ? 'border-[rgba(141,240,180,0.3)] bg-[rgba(10,40,24,0.55)] text-[#8df0b4]'
+                    : 'border-[rgba(232,169,74,0.3)] bg-[rgba(42,28,6,0.55)] text-[#e8c16a]'}`}
+                  >
+                    {usedRemoteIq ? 'Foundry IQ Agent · Remote' : 'Workspace Knowledge Base · Fallback'}
+                  </span>
+                  <span className="ml-auto font-mono text-[10px] text-[#4a7090]">
+                    {sceneIqEntries.length}/{scenes.length} Szenen grounded · {iqCitations.length} zitierte Quellen
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {sceneIqEntries.map((entry) => (
+                    <span
+                      key={`iq-scene-${entry.index}`}
+                      className="rounded-full border border-[rgba(114,228,255,0.14)] bg-[rgba(12,26,46,0.6)] px-2.5 py-1 font-mono text-[10px] text-[#8ea6c3]"
+                    >
+                      Szene {entry.index + 1} · {entry.brief.provider === 'foundry-iq-agent' ? 'Foundry IQ' : 'Local KB'} · {entry.brief.citations.length} Zitate
+                    </span>
+                  ))}
+                </div>
+                {iqCitations.length > 0 && (
+                  <div className="grid gap-2 md:grid-cols-2">
+                    {iqCitations.slice(0, 6).map((citation) => (
+                      <div key={citation.source} className="rounded-lg border border-[rgba(114,228,255,0.08)] bg-[rgba(4,10,20,0.72)] p-3">
+                        <div className="truncate font-mono text-[10px] uppercase tracking-[0.14em] text-[#72e4ff]">{citation.source}</div>
+                        <div className="mt-1 text-[10px] leading-relaxed text-[#8ea6c3]">{citation.excerpt}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Batch actions */}
             <div className="flex flex-wrap items-center gap-3">
               <button
@@ -2527,9 +3006,11 @@ export default function StillframeHarness({
               <Film size={18} className="text-[#2a5a7a]" />
             </div>
             <p className="font-mono text-sm text-[#2a4060]">
-              {generationMode === 'satire'
-                ? <>Waehle eine Voreinstellung, optional Referenzbilder und einen Satire-Fokus, und starte oben <span className="text-[#4a7090]">Satire Sketch + 4 Beats</span></>
-                : <>Gib ein Konzept, 3 bis 5 Keywords oder Referenzbilder oben ein und klicke auf <span className="text-[#4a7090]">Generate Story Beats</span></>}
+              {studioView === 'demo'
+                ? <>Starte oben den <span className="text-[#4a7090]">Demo-Lauf</span>, um vier loopbare GIF-Szenen für die nächste Stream-Dia-Show zu produzieren – oder wechsle in die <button type="button" onClick={() => setStudioView('werkstatt')} className="text-[#c7a7ff] underline decoration-dotted underline-offset-2 transition hover:text-[#e6d6ff]">Werkstatt</button> fuer Modus, Ideen-Generator und manuelles Scene Composing.</>
+                : generationMode === 'satire'
+                  ? <>Waehle eine Voreinstellung, optional Referenzbilder und einen Satire-Fokus, und starte oben <span className="text-[#4a7090]">Satire Sketch + 4 Beats</span></>
+                  : <>Gib ein Konzept, 3 bis 5 Keywords oder Referenzbilder oben ein und klicke auf <span className="text-[#4a7090]">Generate Story Beats</span></>}
             </p>
           </div>
         )}
@@ -2538,6 +3019,7 @@ export default function StillframeHarness({
         {/* End two-column studio grid */}
         </div>
 
+        {studioView === 'werkstatt' && (
         <section
           ref={storyComposerSectionRef}
           className="scroll-mt-24 rounded-[24px] border border-[rgba(232,169,74,0.16)] bg-[rgba(8,10,18,0.86)] p-5 backdrop-blur-sm"
@@ -2547,7 +3029,7 @@ export default function StillframeHarness({
               <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#8a6a30]">Scene composing</div>
               <h2 className="mt-1 font-mono text-lg font-semibold text-[#f3f8ff]">Story Scenes GIF Composer</h2>
               <p className="mt-1 max-w-3xl text-xs leading-relaxed text-[#8ea6c3]">
-                Verarbeite freie Ideen oder ARV-Seeds zu editierbaren Szenen, generiere einzelne GIFs oder exportiere komplette Fiction-Runs als ZIP.
+                Verarbeite freie Ideen oder ARV-Seeds zu editierbaren Szenen, generiere einzelne GIFs oder exportiere komplette Fiction-Runs als ZIP – fertiges Dia-Show-Material fuer Musikvideos und Techno-Livestreams auf @audioreworkvisions.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -2574,7 +3056,20 @@ export default function StillframeHarness({
             />
           </div>
         </section>
+        )}
       </main>
+
+      {/* Floating Demo-Generatoren (GIF / Videos) nur in der Werkstatt */}
+      {studioView === 'werkstatt' && (
+        <>
+          <Suspense fallback={null}>
+            <RandomGifGenerator />
+          </Suspense>
+          <Suspense fallback={null}>
+            <RandomVideoGenerator />
+          </Suspense>
+        </>
+      )}
     </div>
   );
 }
