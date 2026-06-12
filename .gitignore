@@ -37,7 +37,6 @@ repomix-output.xml
 audio_titel_liste.md
 obs_ai_visual.py
 obs_babylon_arv.py
-package-lock.json
 mp4_to_gif_converter.py
 .env.local
 .env
