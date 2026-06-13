@@ -125,6 +125,10 @@ const normalizeTextOverlayPatch = (value: unknown): Partial<ThumbnailTextOverlay
   if (textStyle === 'brutal-industrial' || textStyle === 'signal-minimal' || textStyle === 'arv-transmission') {
     patch.textStyle = textStyle;
   }
+  const localOverlay = asNonEmptyString(draft.localOverlay);
+  if (localOverlay === 'none' || localOverlay === 'minimal' || localOverlay === 'full') {
+    patch.localOverlay = localOverlay;
+  }
   if (Array.isArray(draft.icons)) {
     patch.icons = draft.icons
       .map((icon) => asNonEmptyString(icon))

@@ -69,10 +69,10 @@ export default function ThumbnailPreviewPanel({
           onClick={onGenerateBackground}
           disabled={generatingBackground || !backgroundConfigured}
           className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs font-semibold text-zinc-200 transition hover:border-cyan-700 disabled:cursor-not-allowed disabled:opacity-40"
-          title={backgroundConfigured ? 'Hintergrund über Azure generieren' : 'Azure Image Generation nicht konfiguriert'}
+          title={backgroundConfigured ? 'Finales Thumbnail mit einfachem Titel über Azure generieren' : 'Azure Image Generation nicht konfiguriert'}
         >
           {generatingBackground ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
-          Hintergrund generieren
+          Thumbnail mit Titel generieren
         </button>
         <button
           type="button"
@@ -80,7 +80,7 @@ export default function ThumbnailPreviewPanel({
           className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs font-semibold text-zinc-200 transition hover:border-cyan-700"
         >
           <Upload size={14} />
-          Eigenen Hintergrund hochladen
+          Eigenes Bild hochladen
         </button>
         <input
           ref={fileInputRef}
@@ -96,7 +96,7 @@ export default function ThumbnailPreviewPanel({
           className="inline-flex items-center gap-2 rounded-lg border border-cyan-700 bg-cyan-950/50 px-3 py-2 text-xs font-semibold text-cyan-200 transition hover:border-cyan-500 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {rendering ? <Loader2 size={14} className="animate-spin" /> : <ImageIcon size={14} />}
-          Thumbnail rendern
+          Thumbnail exportieren
         </button>
         {render && (
           <button

@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useCallback, useEffect, useState } from 'react';
-import { BookOpen, Film, Loader2, Moon, Sparkles, Sun } from 'lucide-react';
+import { BookOpen, Loader2, Moon, Sun } from 'lucide-react';
 import type { LibraryIdeaItem } from './lib/libraryDB';
 import { useLibrary } from './hooks/useLibrary';
 import { useFeedback } from './hooks/useFeedback';
@@ -10,6 +10,7 @@ import { DEFAULT_STYLE_FLEX_MODE } from './lib/styleTaste';
 
 const Library = lazy(() => import('./components/Library'));
 const StillframeHarness = lazy(() => import('./components/StillframeHarness'));
+const StoryGifComposerPage = lazy(() => import('./components/StoryGifComposerPage'));
 const ThumbnailStudio = lazy(() => import('./components/ThumbnailStudio'));
 const AzureUsagePanel = lazy(() => import('./components/AzureUsagePanel'));
 
@@ -19,6 +20,87 @@ interface BrowserLocationState {
 }
 
 const STILLFRAME_IDEA_REMIX_STORAGE_KEY = 'hyroglyphis:stillframe-ideas-remix';
+const ARV_COPYRIGHT_TEXT = 'ARV COPYRIGHT 2026 AUDIOREWORKVISIONS';
+
+type AppRouteId = 'stillframe' | 'thumbnail-studio' | 'story-gif-composer' | 'library';
+
+interface AppChromeProps {
+  activeRoute: AppRouteId;
+  children: React.ReactNode;
+  darkMode: boolean;
+  libraryCount: number;
+  onNavigate: (target: string) => void;
+  onToggleDarkMode: () => void;
+}
+
+const ROUTE_META: Record<AppRouteId, { path: string; label: string; detail: string }> = {
+  stillframe: { path: '/stillframe', label: 'Stillframe Studio', detail: 'Visual Engine' },
+  'thumbnail-studio': { path: '/thumbnail-studio', label: 'Thumbnail Studio', detail: 'YouTube Assets' },
+  'story-gif-composer': { path: '/story-gif-composer', label: 'Story GIF Composer', detail: 'Scene ZIPs' },
+  library: { path: '/library', label: 'Library', detail: 'Memory' },
+};
+
+function AppChrome({ activeRoute, children, darkMode, libraryCount, onNavigate, onToggleDarkMode }: AppChromeProps) {
+  return (
+    <div className="signal-shell flex min-h-screen flex-col bg-[#02040e] text-[#f3f8ff]">
+      <header className="sticky top-0 z-40 border-b border-[rgba(114,228,255,0.16)] bg-[rgba(4,6,16,0.92)] px-4 py-3 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-[1500px] flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => onNavigate('/stillframe')}
+            className="flex min-w-[220px] items-center gap-3 rounded-2xl border border-transparent px-1 py-1 text-left transition hover:border-[rgba(114,228,255,0.18)] hover:bg-[rgba(7,14,28,0.72)]"
+          >
+            <img src="/arv_logo.png" alt="ARV" className="h-12 w-12 rounded-xl border border-[rgba(210,255,77,0.28)] bg-black/40 object-contain p-1 shadow-[0_0_28px_rgba(210,255,77,0.16)]" />
+            <span>
+              <span className="block font-mono text-[10px] uppercase tracking-[0.24em] text-[#d2ff4d]">Audioreworkvisions</span>
+              <span className="block font-mono text-sm font-semibold text-[#f3f8ff]">Hyroglyphs</span>
+            </span>
+          </button>
+
+          <nav className="flex flex-1 flex-wrap items-center gap-2" aria-label="App Navigation">
+            {(Object.keys(ROUTE_META) as AppRouteId[]).map((routeId) => {
+              const route = ROUTE_META[routeId];
+              const active = routeId === activeRoute;
+              return (
+                <button
+                  key={routeId}
+                  type="button"
+                  onClick={() => onNavigate(route.path)}
+                  className={`rounded-xl border px-3 py-2 text-left font-mono text-[10px] font-semibold uppercase tracking-[0.12em] transition ${active
+                    ? 'border-[rgba(210,255,77,0.35)] bg-[rgba(35,46,12,0.68)] text-[#d2ff4d] shadow-[0_0_24px_rgba(210,255,77,0.08)]'
+                    : 'border-[rgba(114,228,255,0.14)] bg-[rgba(7,14,28,0.68)] text-[#8ea6c3] hover:border-[rgba(114,228,255,0.32)] hover:text-[#72e4ff]'}`}
+                >
+                  <span className="block">{route.label}</span>
+                  <span className="mt-0.5 block text-[9px] font-normal tracking-[0.08em] opacity-60">
+                    {routeId === 'library' ? `${libraryCount} Items` : route.detail}
+                  </span>
+                </button>
+              );
+            })}
+          </nav>
+
+          <button
+            type="button"
+            onClick={onToggleDarkMode}
+            className="rounded-xl border border-[rgba(114,228,255,0.16)] bg-[rgba(7,14,28,0.82)] p-2 text-[#8ea6c3] transition hover:border-[rgba(114,228,255,0.35)] hover:text-[#72e4ff]"
+            title="Theme umschalten"
+          >
+            {darkMode ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
+        </div>
+      </header>
+
+      <div className="flex-1">{children}</div>
+
+      <footer className="border-t border-[rgba(114,228,255,0.14)] bg-[rgba(4,6,16,0.82)] px-4 py-5">
+        <div className="mx-auto flex max-w-[1500px] items-center justify-between gap-3 text-[11px] uppercase tracking-[0.22em] text-[#8ea6c3]">
+          <span>{ARV_COPYRIGHT_TEXT}</span>
+          <img src="/arv_logo.png" alt="ARV" className="h-7 w-7 rounded-md object-contain opacity-70" />
+        </div>
+      </footer>
+    </div>
+  );
+}
 
 const getBrowserLocationState = (): BrowserLocationState => {
   if (typeof window === 'undefined') {
@@ -89,6 +171,8 @@ export default function App() {
   useEffect(() => {
     if (browserLocation.pathname === '/library') {
       document.title = 'Hyroglyphs Library';
+    } else if (browserLocation.pathname === '/story-gif-composer') {
+      document.title = 'Hyroglyphs Story GIF Composer';
     } else if (browserLocation.pathname === '/thumbnail-studio') {
       document.title = 'ARV Thumbnail Studio';
     } else {
@@ -161,54 +245,39 @@ export default function App() {
 
   const isLibraryRoute = browserLocation.pathname === '/library';
   const isThumbnailStudioRoute = browserLocation.pathname === '/thumbnail-studio';
+  const isStoryGifComposerRoute = browserLocation.pathname === '/story-gif-composer';
+  const activeRoute: AppRouteId = isLibraryRoute
+    ? 'library'
+    : isThumbnailStudioRoute
+      ? 'thumbnail-studio'
+      : isStoryGifComposerRoute
+        ? 'story-gif-composer'
+        : 'stillframe';
 
   return (
-    <>
-      {isThumbnailStudioRoute ? (
-        <Suspense fallback={<SurfaceFallback label="ARV Thumbnail Studio wird geladen" fullScreen />}>
-          <ThumbnailStudio
-            darkMode={darkMode}
-            onToggleDarkMode={() => setDarkMode((current) => !current)}
-            onNavigateStillframe={() => navigate('/stillframe')}
-            onNavigateLibrary={() => navigate('/library')}
+    <AppChrome
+      activeRoute={activeRoute}
+      darkMode={darkMode}
+      libraryCount={libraryItems.length}
+      onNavigate={navigate}
+      onToggleDarkMode={() => setDarkMode((current) => !current)}
+    >
+      {isStoryGifComposerRoute ? (
+        <Suspense fallback={<SurfaceFallback label="Story GIF Composer wird geladen" fullScreen />}>
+          <StoryGifComposerPage
+            model={model}
+            setModel={setModel}
+            saveToLibrary={saveToLibrary}
+            onStorySaved={showSavedToast}
+            preloadedStoryboard={arvStoryboard}
+            onAzureUsage={addAzureUsageEntry}
           />
         </Suspense>
+      ) : isThumbnailStudioRoute ? (
+        <Suspense fallback={<SurfaceFallback label="ARV Thumbnail Studio wird geladen" fullScreen />}>
+          <ThumbnailStudio />
+        </Suspense>
       ) : isLibraryRoute ? (
-        <div className="min-h-screen bg-stone-50 text-stone-900 dark:bg-zinc-950 dark:text-stone-100">
-          <header className="sticky top-0 z-20 border-b border-stone-200 bg-white/80 px-4 py-3 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-950/80">
-            <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => navigate('/stillframe')}
-                  className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 transition hover:border-indigo-300 dark:border-indigo-900/60 dark:bg-indigo-950/30 dark:text-indigo-300"
-                >
-                  <Film size={14} />
-                  Stillframe Studio
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate('/thumbnail-studio')}
-                  className="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 transition hover:border-amber-300 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300"
-                >
-                  <Sparkles size={14} />
-                  Thumbnail Studio
-                </button>
-              </div>
-              <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400">
-                Bibliothek · {libraryItems.length} Items
-              </div>
-              <button
-                type="button"
-                onClick={() => setDarkMode((current) => !current)}
-                className="rounded-xl border border-stone-200 bg-white p-2 text-stone-600 transition hover:border-stone-300 dark:border-zinc-800 dark:bg-zinc-900 dark:text-stone-300"
-                title="Theme umschalten"
-              >
-                {darkMode ? <Sun size={16} /> : <Moon size={16} />}
-              </button>
-            </div>
-          </header>
-
           <main className="mx-auto max-w-7xl px-4 py-8">
             <Suspense fallback={<SurfaceFallback label="Bibliothek wird geladen" />}>
               <Library
@@ -220,27 +289,16 @@ export default function App() {
                 onFollowUp={(concept) => {
                   const board = generateStorySequence(concept, undefined, styleMode);
                   setArvStoryboard(board);
-                  navigate('/stillframe');
+                  navigate('/story-gif-composer');
                 }}
                 getFeedbackFor={getFeedbackFor}
                 styleProfile={styleProfile}
               />
             </Suspense>
           </main>
-        </div>
       ) : (
         <Suspense fallback={<SurfaceFallback label="Stillframe Studio wird geladen" fullScreen />}>
-          <StillframeHarness
-            model={model}
-            setModel={setModel}
-            saveToLibrary={saveToLibrary}
-            onStorySaved={showSavedToast}
-            preloadedStoryboard={arvStoryboard}
-            onAzureUsage={addAzureUsageEntry}
-            onNavigateLibrary={() => navigate('/library')}
-            onNavigateThumbnailStudio={() => navigate('/thumbnail-studio')}
-            libraryCount={libraryItems.length}
-          />
+          <StillframeHarness />
         </Suspense>
       )}
 
@@ -256,6 +314,6 @@ export default function App() {
           <AzureUsagePanel entries={azureUsageEntries} totals={azureUsageTotals} onClear={clearAzureUsage} />
         </Suspense>
       )}
-    </>
+    </AppChrome>
   );
 }

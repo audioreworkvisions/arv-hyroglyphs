@@ -125,7 +125,7 @@ export default function ThumbnailConceptPanel({ concept }: ThumbnailConceptPanel
 
         <div className={cardClass}>
           <div className="flex items-center justify-between gap-2">
-            <h4 className={headingClass}>Hintergrund-Prompt (ohne finalen Titel)</h4>
+            <h4 className={headingClass}>Finalbild-Prompt (Titel + Hintergrund)</h4>
             <CopyButton value={concept.backgroundPrompt} label="Copy Prompt" />
           </div>
           <pre className="whitespace-pre-wrap text-xs text-zinc-400">{concept.backgroundPrompt}</pre>
@@ -137,7 +137,7 @@ export default function ThumbnailConceptPanel({ concept }: ThumbnailConceptPanel
         </div>
 
         <div className={cardClass}>
-          <h4 className={headingClass}>Text Overlay Config</h4>
+          <h4 className={headingClass}>Titel-Render-Modus</h4>
           <div className="grid gap-1 text-xs text-zinc-400 sm:grid-cols-2">
             <span>Topline: <span className="text-zinc-200">{concept.textOverlay.topline}</span></span>
             <span>Footer: <span className="text-zinc-200">{concept.textOverlay.footer}</span></span>
@@ -145,6 +145,7 @@ export default function ThumbnailConceptPanel({ concept }: ThumbnailConceptPanel
             <span>Stream #: <span className="text-zinc-200">{concept.textOverlay.streamNumber || '—'}</span></span>
             <span>Style: <span className="text-zinc-200">{concept.textOverlay.textStyle}</span></span>
             <span>Color: <span className="text-zinc-200">{concept.textOverlay.colorLogic}</span></span>
+            <span>Lokales Overlay: <span className="text-zinc-200">{concept.textOverlay.localOverlay || 'minimal'}</span></span>
           </div>
         </div>
       </div>
@@ -159,7 +160,7 @@ export default function ThumbnailConceptPanel({ concept }: ThumbnailConceptPanel
           <div><dt className="text-xs uppercase tracking-wide text-zinc-500">Warum dieses Thema</dt><dd className="text-zinc-300">{decision.whyTheme}</dd></div>
           <div><dt className="text-xs uppercase tracking-wide text-zinc-500">Warum dieses Layout</dt><dd className="text-zinc-300">{decision.whyLayout}</dd></div>
           <div><dt className="text-xs uppercase tracking-wide text-zinc-500">Warum diese Palette</dt><dd className="text-zinc-300">{decision.whyPalette}</dd></div>
-          <div><dt className="text-xs uppercase tracking-wide text-zinc-500">Warum lokaler Text-Render</dt><dd className="text-zinc-300">{decision.whyLocalText}</dd></div>
+          <div><dt className="text-xs uppercase tracking-wide text-zinc-500">Warum dieser Titel-Render</dt><dd className="text-zinc-300">{decision.whyLocalText}</dd></div>
         </dl>
         {decision.usedIqRules.length > 0 && (
           <div className="space-y-1.5">

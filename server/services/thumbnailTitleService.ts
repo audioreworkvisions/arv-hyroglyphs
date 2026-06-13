@@ -6,7 +6,7 @@
  * Tier 3: a fully local template generator (word pools) keeps the tool working
  *         with zero Azure configuration.
  *
- * No Gemini / Fal. Slogan is always PEACE LOVE TECHNO.
+ * No Gemini / Fal. Metadata footer slogan is always PEACE LOVE TECHNO.
  */
 
 import { foundryGenerateText } from '../../services/foundryService';
@@ -25,14 +25,12 @@ const WORD_FIELD = [
 ];
 
 const TITLE_TEMPLATES = [
-  (a: string, b: string) => `${a} AGAINST THE ${b}`,
-  (a: string, b: string) => `${a} AFTER MIDNIGHT`,
+  (a: string, b: string) => `${a}`,
   (a: string, b: string) => `${a} ${b}`,
-  (a: string, b: string) => `${a} FROM BELOW`,
-  (a: string, b: string) => `RAW ${a} ${b}`,
-  (a: string, b: string) => `THE ${a} WON'T COMPLY`,
-  (a: string, b: string) => `${a} TRANSMISSION`,
-  (a: string, b: string) => `${a} // ${b}`,
+  (a: string, b: string) => `${a} SIGNAL`,
+  (a: string, b: string) => `RAW ${a}`,
+  (a: string, b: string) => `${a} PULSE`,
+  (a: string, b: string) => `${a} RITUAL`,
 ];
 
 export interface TitleGenerationInput {
@@ -94,7 +92,7 @@ const buildLocalTitleVariants = (input: TitleGenerationInput): ThumbnailTitleVar
       title,
       subtitle: toUpperTitle(`${input.genre || 'RAW HARDGROOVE TECHNO'}`),
       score: 60 + ((Math.abs(seed) % 40)),
-      reason: `Built from ARV word field (${a} + ${b}) on a ${template.name || 'transmission'} pattern; uppercase and YouTube-ready.`,
+      reason: `Simple ARV title built from a compact word field (${a}${a === b ? '' : ` + ${b}`}); intended as the only readable text in the generated thumbnail.`,
     });
   }
 
@@ -148,8 +146,10 @@ const buildSystemPrompt = (input: TitleGenerationInput): string => {
     '',
     'Title rules:',
     '- Always UPPERCASE.',
-    '- Short, strong, YouTube-ready.',
+    '- Simple and direct: ideally 1 to 3 words, maximum 4 words.',
+    '- This selectedTitle will be rendered by the image model as the ONLY readable text in the thumbnail.',
     '- No generic EDM titles, no long academic titles, no mainstream influencer language.',
+    '- Avoid slashes, subtitles, slogans, hashtags, dates, stream numbers and stacked phrases in selectedTitle.',
     '- Must fit Audioreworkvisions and Techno Transmissions.',
     '- Do not copy old titles 1:1 unless an explicit continuation is requested.',
     `- Good word fields: ${WORD_FIELD.join(', ')}.`,

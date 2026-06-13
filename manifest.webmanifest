@@ -1,0 +1,18 @@
+{
+  "name": "Hyroglyphs ARV Studio",
+  "short_name": "Hyroglyphs",
+  "description": "Creative AI studio for Audioreworkvisions stillframes, thumbnails, and story GIF composition.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#02040e",
+  "theme_color": "#02040e",
+  "icons": [
+    {
+      "src": "/arv_logo.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

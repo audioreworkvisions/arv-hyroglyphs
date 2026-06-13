@@ -1,10 +1,10 @@
 /**
  * Thumbnail render service.
  *
- * Renders the EXACT title text locally (Sharp + SVG overlay) onto a background,
- * because AI image models misspell text. Produces a 1920x1080 PNG (or JPG) with
- * safe margins, auto-fitted multiline title, topline, subtitle, footer, stream
- * number and simple SVG icons (peace / heart / vinyl).
+ * Exports a 1920x1080 PNG (or JPG). In the normal AI-composed thumbnail flow,
+ * the image model already renders the simple title together with the background,
+ * so this service only resizes/exports. A small local overlay remains available
+ * as a fallback for background-only/manual uploads.
  *
  * If no background is supplied, a dark analog ARV gradient is generated so the
  * tool always produces a usable thumbnail (offline fallback tier).
@@ -100,14 +100,14 @@ const splitTitleIntoLines = (title: string, fontSize: number, maxWidth: number, 
 };
 
 const fitTitle = (title: string): { fontSize: number; lines: string[] } => {
-  let fontSize = 230;
-  const minFontSize = 90;
+  let fontSize = 122;
+  const minFontSize = 54;
 
   while (fontSize > minFontSize) {
     const lines = splitTitleIntoLines(title, fontSize, SAFE_WIDTH, 3);
     const longestLineWidth = Math.max(...lines.map((line) => estimateTextWidth(line, fontSize)));
     const totalHeight = lines.length * fontSize * 1.05;
-    if (longestLineWidth <= SAFE_WIDTH && totalHeight <= 620) {
+    if (longestLineWidth <= SAFE_WIDTH && totalHeight <= 300) {
       return { fontSize, lines };
     }
     fontSize -= 8;
@@ -156,13 +156,13 @@ const buildOverlaySvg = (params: OverlayParams): string => {
   const { fontSize, lines } = fitTitle(params.title || 'UNTITLED');
   const lineHeight = fontSize * 1.05;
   const titleBlockHeight = lines.length * lineHeight;
-  const centerY = HEIGHT / 2;
+  const centerY = HEIGHT * 0.56;
   const titleStartY = centerY - titleBlockHeight / 2 + fontSize * 0.78;
 
   const titleSpans = lines
     .map((line, index) => {
       const y = titleStartY + index * lineHeight;
-      return `<text x="${WIDTH / 2}" y="${y}" text-anchor="middle" font-family="${FONT_STACK}" font-size="${fontSize}" font-weight="900" letter-spacing="${params.textStyle === 'signal-minimal' ? 8 : 2}" fill="${palette.title}" stroke="${palette.shadow}" stroke-width="${Math.max(4, fontSize * 0.03)}" paint-order="stroke">${escapeXml(line)}</text>`;
+      return `<text x="${WIDTH / 2}" y="${y}" text-anchor="middle" font-family="${FONT_STACK}" font-size="${fontSize}" font-weight="850" letter-spacing="${params.textStyle === 'signal-minimal' ? 4 : 1}" fill="${palette.title}" stroke="${palette.shadow}" stroke-width="${Math.max(2, fontSize * 0.018)}" paint-order="stroke">${escapeXml(line)}</text>`;
     })
     .join('\n');
 
@@ -201,7 +201,7 @@ const buildOverlaySvg = (params: OverlayParams): string => {
       <stop offset="100%" stop-color="#000000" stop-opacity="0.7" />
     </linearGradient>
   </defs>
-  <rect x="0" y="0" width="${WIDTH}" height="${HEIGHT}" fill="url(#titleScrim)" />
+  <rect x="0" y="0" width="${WIDTH}" height="${HEIGHT}" fill="url(#titleScrim)" opacity="0.45" />
   ${toplineMarkup}
   ${streamMarkup}
   ${titleSpans}
@@ -269,7 +269,8 @@ export const renderThumbnail = async (
     .resize(WIDTH, HEIGHT, { fit: 'cover', position: 'centre' })
     .toBuffer();
 
-  const overlaySvg = buildOverlaySvg({
+  const shouldApplyOverlay = layout.localOverlay !== 'none';
+  const overlaySvg = shouldApplyOverlay ? buildOverlaySvg({
     title: request.title || layout.mainTitle || 'UNTITLED',
     subtitle: request.subtitle ?? layout.subtitle ?? '',
     topline: request.topline ?? layout.topline ?? ARV_TOPLINE,
@@ -277,9 +278,11 @@ export const renderThumbnail = async (
     streamNumber: request.streamNumber ?? layout.streamNumber ?? '',
     textStyle: layout.textStyle || 'arv-transmission',
     icons: layout.icons && layout.icons.length > 0 ? layout.icons : ['peace', 'heart', 'vinyl'],
-  });
+  }) : null;
 
-  const composited = sharp(normalizedBackground).composite([{ input: Buffer.from(overlaySvg), top: 0, left: 0 }]);
+  const composited = overlaySvg
+    ? sharp(normalizedBackground).composite([{ input: Buffer.from(overlaySvg), top: 0, left: 0 }])
+    : sharp(normalizedBackground);
   const outputBuffer =
     format === 'jpg'
       ? await composited.jpeg({ quality: 92 }).toBuffer()

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, BookOpen, Film, Loader2, Moon, Save, Search, Sparkles, Sun } from 'lucide-react';
+import { AlertTriangle, Loader2, Save, Search, Sparkles } from 'lucide-react';
 import type {
   FoundryIqMemoryResult,
   ThumbnailBackgroundResult,
@@ -17,13 +17,6 @@ import FoundryIqMemoryPanel from './thumbnail-studio/FoundryIqMemoryPanel';
 import ThumbnailConceptPanel from './thumbnail-studio/ThumbnailConceptPanel';
 import ThumbnailPreviewPanel from './thumbnail-studio/ThumbnailPreviewPanel';
 import ThumbnailHistoryPanel from './thumbnail-studio/ThumbnailHistoryPanel';
-
-interface ThumbnailStudioProps {
-  darkMode: boolean;
-  onToggleDarkMode: () => void;
-  onNavigateStillframe: () => void;
-  onNavigateLibrary: () => void;
-}
 
 const DEFAULT_FORM: ThumbnailFormState = {
   title: '',
@@ -53,12 +46,7 @@ const postJson = async <T,>(url: string, body: unknown): Promise<T> => {
 const actionButtonClass =
   'inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-40';
 
-export default function ThumbnailStudio({
-  darkMode,
-  onToggleDarkMode,
-  onNavigateStillframe,
-  onNavigateLibrary,
-}: ThumbnailStudioProps) {
+export default function ThumbnailStudio() {
   const [form, setForm] = useState<ThumbnailFormState>(DEFAULT_FORM);
   const [uploads, setUploads] = useState<ThumbnailUploadedImage[]>([]);
   const [health, setHealth] = useState<ThumbnailStudioHealth | null>(null);
@@ -260,7 +248,7 @@ export default function ThumbnailStudio({
               palette: concept.palette,
               layout: concept.layout,
               whatGenerated: `${concept.youtubeTitle} — ${concept.shortConcept}`,
-              whatWorked: 'Local exact-title render with Foundry IQ creative brand memory.',
+              whatWorked: 'AI-composed exact-title thumbnail with Foundry IQ creative brand memory.',
               avoidNextTime: concept.creativeDecision.avoidedPatterns.join('; '),
               backgroundPrompt: concept.backgroundPrompt,
               negativePrompt: concept.negativePrompt,
@@ -311,48 +299,15 @@ export default function ThumbnailStudio({
   }, [health]);
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <header className="sticky top-0 z-20 border-b border-zinc-800 bg-zinc-950/85 px-4 py-3 backdrop-blur-md">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onNavigateStillframe}
-              className="inline-flex items-center gap-2 rounded-xl border border-indigo-900/60 bg-indigo-950/30 px-3 py-2 text-xs font-semibold text-indigo-300 transition hover:border-indigo-700"
-            >
-              <Film size={14} />
-              Stillframe Studio
-            </button>
-            <button
-              type="button"
-              onClick={onNavigateLibrary}
-              className="inline-flex items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs font-semibold text-zinc-300 transition hover:border-zinc-600"
-            >
-              <BookOpen size={14} />
-              Library
-            </button>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="hidden font-mono text-[11px] uppercase tracking-[0.18em] text-zinc-500 sm:inline">
-              {fallbackTier}
-            </span>
-            <button
-              type="button"
-              onClick={onToggleDarkMode}
-              className="rounded-xl border border-zinc-800 bg-zinc-900 p-2 text-zinc-300 transition hover:border-zinc-700"
-              title="Theme umschalten"
-            >
-              {darkMode ? <Sun size={16} /> : <Moon size={16} />}
-            </button>
-          </div>
-        </div>
-      </header>
-
+    <div className="min-h-full text-zinc-100">
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-8">
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <Sparkles size={22} className="text-amber-400" />
             <h1 className="text-2xl font-black tracking-tight text-zinc-50">ARV Thumbnail Studio</h1>
+          </div>
+          <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-zinc-500">
+            {fallbackTier}
           </div>
           <p className="max-w-3xl text-sm text-zinc-400">
             Generiert Titel, Thema, YouTube-Metadaten und ein finales 16:9-Thumbnail für den nächsten Audioreworkvisions

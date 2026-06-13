@@ -19,8 +19,7 @@ import {
   TriangleAlert,
   X,
 } from 'lucide-react';
-import StoryMode from './StoryMode';
-import type { ARVSatireSketch, ARVStorySequence } from '../lib/arvTypes';
+import type { ARVSatireSketch } from '../lib/arvTypes';
 
 const RandomGifGenerator = lazy(() => import('./arv-live/RandomGifGenerator'));
 const RandomVideoGenerator = lazy(() => import('./arv-live/RandomVideoGenerator'));
@@ -34,8 +33,7 @@ import {
   STILLFRAME_SATIRE_PRESET_PROFILES,
   type StillframeSatireElementCategory,
 } from '../lib/stillframeSatire';
-import { saveItem, type LibraryIdeaItem, type LibraryItem } from '../lib/libraryDB';
-import type { AzureUsageEntry } from '../hooks/useAzureUsage';
+import { saveItem, type LibraryIdeaItem } from '../lib/libraryDB';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -580,32 +578,7 @@ const initScenes = (beats: SceneBeat[]): SceneState[] =>
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-interface StillframeHarnessProps {
-  model: 'openai' | 'foundry';
-  setModel: (model: 'openai' | 'foundry') => void;
-  saveToLibrary: (item: LibraryItem) => Promise<void>;
-  onStorySaved: () => void;
-  preloadedStoryboard?: ARVStorySequence | null;
-  onAzureUsage?: (entry: Omit<AzureUsageEntry, 'id' | 'timestamp'>) => void;
-  onNavigateLibrary?: () => void;
-  onNavigateThumbnailStudio?: () => void;
-  libraryCount?: number;
-}
-
-type StillframeWorkspace = 'stillframe' | 'storyComposer';
-
-export default function StillframeHarness({
-  model,
-  setModel,
-  saveToLibrary,
-  onStorySaved,
-  preloadedStoryboard,
-  onAzureUsage,
-  onNavigateLibrary,
-  onNavigateThumbnailStudio,
-  libraryCount = 0,
-}: StillframeHarnessProps) {
-  const [activeWorkspace, setActiveWorkspace] = useState<StillframeWorkspace>('stillframe');
+export default function StillframeHarness() {
   const [generationMode, setGenerationMode] = useState<GenerationMode>('ritual');
   const [outputMode, setOutputMode] = useState<GenerationMode | null>(null);
   const [concept, setConcept] = useState('');
@@ -660,7 +633,6 @@ export default function StillframeHarness({
   const hasRequestedInitialStoryMemoryLoadRef = useRef(false);
   const ideaSectionRef = useRef<HTMLElement | null>(null);
   const stillframeSectionRef = useRef<HTMLDivElement | null>(null);
-  const storyComposerSectionRef = useRef<HTMLElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const referenceInputRef = useRef<HTMLInputElement>(null);
   const didBootstrapIdeaRemixRef = useRef(false);
@@ -2164,19 +2136,13 @@ export default function StillframeHarness({
     });
   });
 
-  const scrollToPanel = useCallback((target: 'ideas' | StillframeWorkspace) => {
-    const targetRef = target === 'ideas'
-      ? ideaSectionRef
-      : target === 'storyComposer'
-        ? storyComposerSectionRef
-        : stillframeSectionRef;
+  const scrollToPanel = useCallback((target: 'ideas' | 'stillframe') => {
+    const targetRef = target === 'ideas' ? ideaSectionRef : stillframeSectionRef;
 
     targetRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, []);
 
-  const handleWorkspaceChange = (nextWorkspace: StillframeWorkspace) => {
-    setActiveWorkspace(nextWorkspace);
-    if (nextWorkspace === 'storyComposer') setStudioView('werkstatt');
+  const handleWorkspaceChange = (nextWorkspace: 'stillframe') => {
     window.requestAnimationFrame(() => scrollToPanel(nextWorkspace));
   };
 
@@ -2185,7 +2151,7 @@ export default function StillframeHarness({
       className="min-h-screen signal-shell bg-[#02040e]"
     >
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-30 border-b border-[rgba(114,228,255,0.14)] bg-[rgba(4,6,16,0.9)] px-5 py-3 backdrop-blur-xl">
+      <header className="border-b border-[rgba(114,228,255,0.14)] bg-[rgba(4,6,16,0.72)] px-5 py-3 backdrop-blur-xl">
         <div className="mx-auto flex max-w-[1500px] flex-wrap items-center gap-3">
           <div className="flex min-w-[220px] items-center gap-3">
             <div className="h-7 w-px bg-[rgba(114,228,255,0.12)]" />
@@ -2226,20 +2192,6 @@ export default function StillframeHarness({
           </div>
 
           <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-[rgba(114,228,255,0.12)] bg-[rgba(7,14,28,0.78)] px-2 py-2">
-            <label className="sr-only" htmlFor="stillframe-workspace-select">Arbeitsbereich</label>
-            <div className="relative">
-              <select
-                id="stillframe-workspace-select"
-                value={activeWorkspace}
-                onChange={(event) => handleWorkspaceChange(event.target.value as StillframeWorkspace)}
-                className="h-9 appearance-none rounded-xl border border-[rgba(114,228,255,0.16)] bg-[#071221] py-2 pl-3 pr-8 font-mono text-[11px] font-semibold text-[#72e4ff] outline-none transition focus:border-[rgba(114,228,255,0.42)]"
-              >
-                <option value="stillframe">Stillframe Szenen</option>
-                <option value="storyComposer">Story GIF Composer</option>
-              </select>
-              <ChevronsDown size={13} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#4a7090]" />
-            </div>
-
             <button
               type="button"
               onClick={() => {
@@ -2257,39 +2209,7 @@ export default function StillframeHarness({
             >
               4 Szenen
             </button>
-            <button
-              type="button"
-              onClick={() => handleWorkspaceChange('storyComposer')}
-              className="rounded-xl border border-[rgba(232,169,74,0.16)] bg-[rgba(42,28,6,0.56)] px-3 py-2 font-mono text-[10px] font-semibold text-[#e8c16a] transition hover:border-[rgba(232,169,74,0.32)]"
-            >
-              ZIP Composer
-            </button>
           </div>
-
-          {onNavigateLibrary && (
-            <button
-              type="button"
-              onClick={onNavigateLibrary}
-              className="flex items-center gap-2 rounded-xl border border-[rgba(114,228,255,0.18)] bg-[rgba(10,18,35,0.7)] px-3 py-2 text-xs font-semibold text-[#8ea6c3] transition hover:border-[rgba(114,228,255,0.35)] hover:text-[#72e4ff]"
-            >
-              <BookOpen size={14} />
-              Bibliothek
-              {libraryCount > 0 && (
-                <span className="rounded-full bg-[#0e3a5c] px-1.5 py-0.5 font-mono text-[10px] text-[#72e4ff]">{libraryCount}</span>
-              )}
-            </button>
-          )}
-
-          {onNavigateThumbnailStudio && (
-            <button
-              type="button"
-              onClick={onNavigateThumbnailStudio}
-              className="flex items-center gap-2 rounded-xl border border-[rgba(232,193,106,0.2)] bg-[rgba(42,28,6,0.56)] px-3 py-2 text-xs font-semibold text-[#e8c16a] transition hover:border-[rgba(232,193,106,0.4)] hover:text-[#ffd980]"
-            >
-              <Sparkles size={14} />
-              Thumbnail Studio
-            </button>
-          )}
 
           <div className="ml-auto flex items-center gap-3">
             <span className="font-mono text-[11px] uppercase tracking-[0.28em] text-[#4a7090]">Azure OpenAI Foundry</span>
@@ -3730,7 +3650,7 @@ export default function StillframeHarness({
             </div>
             <p className="font-mono text-sm text-[#2a4060]">
               {studioView === 'demo'
-                ? <>Starte oben den <span className="text-[#4a7090]">Demo-Lauf</span>, um vier loopbare GIF-Szenen für die nächste Stream-Dia-Show zu produzieren – oder wechsle in die <button type="button" onClick={() => setStudioView('werkstatt')} className="text-[#c7a7ff] underline decoration-dotted underline-offset-2 transition hover:text-[#e6d6ff]">Werkstatt</button> fuer Modus, Ideen-Generator und manuelles Scene Composing.</>
+                ? <>Starte oben den <span className="text-[#4a7090]">Demo-Lauf</span>, um vier loopbare GIF-Szenen für die nächste Stream-Dia-Show zu produzieren – oder wechsle in die <button type="button" onClick={() => setStudioView('werkstatt')} className="text-[#c7a7ff] underline decoration-dotted underline-offset-2 transition hover:text-[#e6d6ff]">Werkstatt</button> fuer Modus, Ideen-Generator und manuelle Stillframe-Szenen.</>
                 : studioView === 'manual-demo'
                   ? <>Gib oben einen <span className="text-[#8a6a30]">Simple Prompt</span> ein, lade optional Stilbilder hoch und schreibe daraus automatisch vier editierbare Szenenprompts.</>
                 : generationMode === 'satire'
@@ -3744,44 +3664,6 @@ export default function StillframeHarness({
         {/* End two-column studio grid */}
         </div>
 
-        {studioView === 'werkstatt' && (
-        <section
-          ref={storyComposerSectionRef}
-          className="scroll-mt-24 rounded-[24px] border border-[rgba(232,169,74,0.16)] bg-[rgba(8,10,18,0.86)] p-5 backdrop-blur-sm"
-        >
-          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-            <div className="min-w-0">
-              <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#8a6a30]">Scene composing</div>
-              <h2 className="mt-1 font-mono text-lg font-semibold text-[#f3f8ff]">Story Scenes GIF Composer</h2>
-              <p className="mt-1 max-w-3xl text-xs leading-relaxed text-[#8ea6c3]">
-                Verarbeite freie Ideen oder ARV-Seeds zu editierbaren Szenen, generiere einzelne GIFs oder exportiere komplette Fiction-Runs als ZIP – fertiges Dia-Show-Material fuer Musikvideos und Techno-Livestreams auf @audioreworkvisions.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {preloadedStoryboard && (
-                <span className="rounded-full border border-[rgba(114,228,255,0.18)] bg-[rgba(10,26,46,0.68)] px-3 py-1.5 font-mono text-[10px] font-semibold text-[#72e4ff]">
-                  ARV Seed aktiv · {preloadedStoryboard.scenes.length} Szenen
-                </span>
-              )}
-              <span className="rounded-full border border-[rgba(232,169,74,0.18)] bg-[rgba(42,28,6,0.64)] px-3 py-1.5 font-mono text-[10px] font-semibold text-[#e8c16a]">
-                {model === 'foundry' ? 'Azure Foundry' : 'OpenAI'} Renderer
-              </span>
-            </div>
-          </div>
-
-          <div className="rounded-[20px] border border-[rgba(114,228,255,0.08)] bg-stone-50 p-4 text-stone-900 dark:bg-zinc-950 dark:text-stone-100">
-            <StoryMode
-              embedded
-              model={model}
-              setModel={setModel}
-              onStorySaved={onStorySaved}
-              saveToLibrary={saveToLibrary}
-              preloadedStoryboard={preloadedStoryboard}
-              onAzureUsage={onAzureUsage}
-            />
-          </div>
-        </section>
-        )}
       </main>
 
       {/* Floating Demo-Generatoren (GIF / Videos) nur in der Werkstatt */}

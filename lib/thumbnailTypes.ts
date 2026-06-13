@@ -132,6 +132,7 @@ export interface ThumbnailTextOverlayConfig {
   colorLogic: string;
   textStyle: ThumbnailTextStyle;
   icons: ThumbnailIcon[];
+  localOverlay?: 'none' | 'minimal' | 'full';
 }
 
 export type ThumbnailIcon = 'peace' | 'heart' | 'vinyl';
