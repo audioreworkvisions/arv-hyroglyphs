@@ -1,2 +1,0 @@
-- ARV live bundling: dynamic imports in lib/arv-live/babylon/controllers/registry.ts split controller code effectively.
-- Avoid dynamic importing the full @babylonjs/core barrel in ARV live runtime code; it creates a large extra runtime chunk. Prefer static named imports there and keep only controller modules lazy.

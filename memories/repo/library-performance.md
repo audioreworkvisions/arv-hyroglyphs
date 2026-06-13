@@ -1,4 +1,0 @@
-- StoryMode should upsert one library story snapshot per run; do not create a new story item per completed scene with embedded gifData.
-- For media-heavy saves, useLibrary.save should update local React state incrementally instead of reloading all IndexedDB items after each save.
-- StoryMode ZIP downloads should request a save handle synchronously in the click event when available; async blob downloads after ZIP assembly can lose user activation in Electron/Chromium and fail.
-- In the VS Code embedded browser, blob downloads and even attachment navigations can be unreliable; the stable StoryMode path is server-side ZIP preparation plus client-side showSaveFilePicker write.
