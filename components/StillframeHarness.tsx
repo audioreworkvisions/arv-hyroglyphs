@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import JSZip from 'jszip';
 import {
   BookOpen,
@@ -21,8 +21,6 @@ import {
 } from 'lucide-react';
 import type { ARVSatireSketch } from '../lib/arvTypes';
 
-const RandomGifGenerator = lazy(() => import('./arv-live/RandomGifGenerator'));
-const RandomVideoGenerator = lazy(() => import('./arv-live/RandomVideoGenerator'));
 import { arvMinimalSignalGeometryPreset } from '../lib/minimalSignalGeometryPreset';
 import { PROMPT_TEMPLATES } from '../lib/promptTemplates';
 import {
@@ -184,6 +182,15 @@ interface PipelineLogEntry {
   level: PipelineLogLevel;
   text: string;
 }
+type DemoNarrationStepId = 'ready' | 'concept' | 'grounding' | 'render' | 'results' | 'zip' | 'done' | 'error';
+type DemoFocusTarget = 'demo' | 'log' | 'results' | 'zip';
+interface DemoNarrationStep {
+  id: DemoNarrationStepId;
+  title: string;
+  kicker: string;
+  body: string;
+  target: DemoFocusTarget;
+}
 
 interface StillframeStoryMemoryScene {
   index: number;
@@ -273,6 +280,64 @@ const DEMO_SEEDS: Record<GenerationMode, string> = {
   ritual: 'A suspended glass signal engine breathing over a dark hangar floor, archive dust drifting through cyan scan light, one slow mechanical exhale per loop',
   satire: 'A pressure-core open-plan ritual where a polite glass machine quietly malfunctions during its own performance review',
   signal: 'black CRT field, one acid-cyan spiral tightening into a single dot, scanner sweep with afterimage residue',
+};
+const DEMO_NARRATION_STEPS: Record<DemoNarrationStepId, DemoNarrationStep> = {
+  ready: {
+    id: 'ready',
+    title: 'OBS Demo Assistenz bereit',
+    kicker: 'Aufnahme-Setup',
+    body: 'Starte jetzt die Bildschirmaufnahme und klicke dann auf Demo-Lauf starten. Die App kommentiert den Ablauf visuell und fuehrt den Fokus automatisch durch die Produktion.',
+    target: 'demo',
+  },
+  concept: {
+    id: 'concept',
+    title: 'Story-Konzept und vier Beats entstehen',
+    kicker: 'Schritt 1',
+    body: 'Aus Prompt, Modus und ARV-Stilregeln entsteht ein sendefaehiger Mini-Storyboard-Bogen mit vier editierbaren Szenenprompts.',
+    target: 'demo',
+  },
+  grounding: {
+    id: 'grounding',
+    title: 'Foundry IQ grounded jede Szene',
+    kicker: 'Schritt 2',
+    body: 'Vor dem Rendern werden Kanalstil, Motive und Verbote aus der ARV-Wissensbasis in den finalen Sora-Prompt eingemischt. Das Log zeigt Query, Quellen und Prompt-Preview.',
+    target: 'log',
+  },
+  render: {
+    id: 'render',
+    title: 'Sora rendert Video, danach entsteht der GIF-Loop',
+    kicker: 'Schritt 3',
+    body: 'Jede Szene laeuft sequenziell: Prompt-Preview, Sora-Request, Video-Ergebnis, Konvertierung zu einem loopbaren 16:9-GIF fuer die Dia-Show.',
+    target: 'results',
+  },
+  results: {
+    id: 'results',
+    title: 'Die vier Szenen sind sichtbar nachvollziehbar',
+    kicker: 'Ergebnis',
+    body: 'Die Karten zeigen Titel, Motion, finalen Prompt-Debug, Video-ID und GIF-Status. So sieht man, was wirklich produziert wurde.',
+    target: 'results',
+  },
+  zip: {
+    id: 'zip',
+    title: 'Szenen-ZIP wird vorbereitet',
+    kicker: 'Export',
+    body: 'Das ZIP buendelt story.json, prompts.md und alle vorhandenen GIF-/Sketch-Assets. Es ist das transportierbare Ergebnis fuer Video- und OBS-Produktion.',
+    target: 'zip',
+  },
+  done: {
+    id: 'done',
+    title: 'Demo-Lauf abgeschlossen',
+    kicker: 'Fertig',
+    body: 'Die komplette Pipeline ist dokumentiert: Konzept, Grounding, Render, GIF-Loops und ZIP-Download. Danach kann das Thumbnail Studio Titel, Beschreibung, Hashtags und SEO liefern.',
+    target: 'zip',
+  },
+  error: {
+    id: 'error',
+    title: 'Demo-Lauf braucht Aufmerksamkeit',
+    kicker: 'Fehler',
+    body: 'Ein Schritt hat gemeldet, dass er nicht fertig wurde. Das Live Pipeline Log bleibt im Fokus, damit die Ursache fuer die Aufnahme sichtbar ist.',
+    target: 'log',
+  },
 };
 
 const truncateForLog = (text: string, max = 160): string => {
@@ -605,6 +670,8 @@ export default function StillframeHarness() {
   const [isSketchingAll, setIsSketchingAll] = useState(false);
   const [isRenderingAllVideos, setIsRenderingAllVideos] = useState(false);
   const [demoRun, setDemoRun] = useState<DemoRunState>(IDLE_DEMO_RUN);
+  const [isObsDemoMode, setIsObsDemoMode] = useState(false);
+  const [demoZipExportedAt, setDemoZipExportedAt] = useState<number | null>(null);
   const [studioView, setStudioView] = useState<StudioView>('demo');
   const [pipelineLog, setPipelineLog] = useState<PipelineLogEntry[]>([]);
   const [isDownloadingStoryZip, setIsDownloadingStoryZip] = useState(false);
@@ -631,6 +698,11 @@ export default function StillframeHarness() {
   const [scenes, setScenes] = useState<SceneState[]>([]);
   const scenesRef = useRef<SceneState[]>([]);
   const hasRequestedInitialStoryMemoryLoadRef = useRef(false);
+  const demoSectionRef = useRef<HTMLElement | null>(null);
+  const demoLogSectionRef = useRef<HTMLDivElement | null>(null);
+  const demoResultsSectionRef = useRef<HTMLDivElement | null>(null);
+  const demoZipSectionRef = useRef<HTMLDivElement | null>(null);
+  const obsAutoZipRunRef = useRef<number | null>(null);
   const ideaSectionRef = useRef<HTMLElement | null>(null);
   const stillframeSectionRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -1755,6 +1827,7 @@ export default function StillframeHarness() {
 
       const blob = await zip.generateAsync({ type: 'blob' });
       downloadBlob(blob, `${safeStoryName}-scenes.zip`);
+      setDemoZipExportedAt(Date.now());
       pushPipelineLog('success', `Story-ZIP exportiert · ${currentScenes.filter((scene) => scene.gifData).length} GIF-Loops · ${currentScenes.length} Szenenprompts`);
     } catch (err: any) {
       pushPipelineLog('error', `Story-ZIP konnte nicht erstellt werden: ${err.message || 'Export failed.'}`);
@@ -2012,6 +2085,7 @@ export default function StillframeHarness() {
       startedAt: Date.now(),
       finishedAt: null,
     });
+    setDemoZipExportedAt(null);
     setPipelineLog([]);
     pushPipelineLog('info', `Demo-Lauf gestartet · Modus „${GENERATION_MODE_LABELS[generationMode]}“`);
     pushPipelineLog('info', 'Stufe 1 · Story-Konzept + 4 Beats werden generiert…');
@@ -2135,6 +2209,73 @@ export default function StillframeHarness() {
       }
     });
   });
+
+  const activeDemoStage = DEMO_STAGE_IDS.find((stageId) => demoRun.stages[stageId] === 'active') ?? null;
+  const completedGifCount = scenes.filter((scene) => Boolean(scene.gifData)).length;
+  const activeSceneForNarration = activeVideoBatchIndex >= 0 ? scenes[activeVideoBatchIndex] : null;
+  const demoNarrationStepId: DemoNarrationStepId = demoRun.status === 'error'
+    ? 'error'
+    : demoZipExportedAt
+      ? 'done'
+      : isDownloadingStoryZip
+        ? 'zip'
+        : demoRun.status === 'done'
+          ? 'zip'
+          : activeDemoStage === 'concept'
+            ? 'concept'
+            : activeSceneForNarration?.renderPromptDebug?.iqBrief
+              ? 'render'
+              : activeDemoStage?.startsWith('scene-')
+                ? 'grounding'
+                : completedGifCount > 0
+                  ? 'results'
+                  : 'ready';
+  const demoNarrationStep = DEMO_NARRATION_STEPS[demoNarrationStepId];
+  const demoFocusClass = (target: DemoFocusTarget): string => (
+    isObsDemoMode && demoNarrationStep.target === target
+      ? 'ring-2 ring-[#d2ff4d]/70 shadow-[0_0_44px_rgba(210,255,77,0.18)]'
+      : ''
+  );
+
+  useEffect(() => {
+    if (!isObsDemoMode || studioView !== 'demo') {
+      return;
+    }
+
+    const refMap: Record<DemoFocusTarget, React.RefObject<HTMLElement | HTMLDivElement | null>> = {
+      demo: demoSectionRef,
+      log: demoLogSectionRef,
+      results: demoResultsSectionRef,
+      zip: demoZipSectionRef,
+    };
+    const target = refMap[demoNarrationStep.target]?.current;
+    if (!target) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 220);
+
+    return () => window.clearTimeout(timeout);
+  }, [demoNarrationStep.target, isObsDemoMode, studioView, activeVideoBatchIndex, completedGifCount, isDownloadingStoryZip]);
+
+  useEffect(() => {
+    if (!isObsDemoMode || demoRun.status !== 'done' || !demoRun.finishedAt || demoZipExportedAt || isDownloadingStoryZip) {
+      return;
+    }
+    if (obsAutoZipRunRef.current === demoRun.finishedAt || scenesRef.current.length === 0) {
+      return;
+    }
+
+    obsAutoZipRunRef.current = demoRun.finishedAt;
+    pushPipelineLog('info', 'OBS Demo Assistenz · ZIP-Download startet automatisch in 2 Sekunden…');
+    const timeout = window.setTimeout(() => {
+      void handleDownloadStoryZip();
+    }, 2000);
+
+    return () => window.clearTimeout(timeout);
+  }, [demoRun.finishedAt, demoRun.status, demoZipExportedAt, handleDownloadStoryZip, isDownloadingStoryZip, isObsDemoMode, pushPipelineLog]);
 
   const scrollToPanel = useCallback((target: 'ideas' | 'stillframe') => {
     const targetRef = target === 'ideas' ? ideaSectionRef : stillframeSectionRef;
@@ -2265,7 +2406,7 @@ export default function StillframeHarness() {
 
         {/* Agents League · One-Click Demo Run */}
         {studioView === 'demo' && (
-        <section className="rounded-[24px] border border-[rgba(114,228,255,0.2)] bg-[linear-gradient(135deg,rgba(6,22,42,0.88),rgba(18,10,38,0.88))] p-5 space-y-4 backdrop-blur-sm">
+        <section ref={demoSectionRef} className={`scroll-mt-24 rounded-[24px] border border-[rgba(114,228,255,0.2)] bg-[linear-gradient(135deg,rgba(6,22,42,0.88),rgba(18,10,38,0.88))] p-5 space-y-4 backdrop-blur-sm transition ${demoFocusClass('demo')}`}>
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="max-w-3xl space-y-1.5">
               <div className="font-mono text-[11px] uppercase tracking-[0.24em] text-[#72e4ff]">
@@ -2288,19 +2429,57 @@ export default function StillframeHarness() {
                 )}
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => void handleDemoRun()}
-              disabled={isDemoRunning || isGeneratingConcept || isRenderingAllVideos || hasActiveVideoRender}
-              className="flex items-center gap-2 rounded-xl border border-[rgba(114,228,255,0.4)] bg-[#0e3a5c] px-6 py-3 font-mono text-xs font-semibold text-[#9ff0ff] shadow-[0_0_30px_rgba(114,228,255,0.12)] transition hover:bg-[#155083] disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {isDemoRunning ? (
-                <><Loader2 size={15} className="animate-spin" />Demo läuft…</>
-              ) : (
-                <><Play size={15} />Demo-Lauf starten</>
-              )}
-            </button>
+            <div className="flex flex-col items-stretch gap-2 sm:min-w-[230px]">
+              <button
+                type="button"
+                onClick={() => void handleDemoRun()}
+                disabled={isDemoRunning || isGeneratingConcept || isRenderingAllVideos || hasActiveVideoRender}
+                className="flex items-center justify-center gap-2 rounded-xl border border-[rgba(114,228,255,0.4)] bg-[#0e3a5c] px-6 py-3 font-mono text-xs font-semibold text-[#9ff0ff] shadow-[0_0_30px_rgba(114,228,255,0.12)] transition hover:bg-[#155083] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {isDemoRunning ? (
+                  <><Loader2 size={15} className="animate-spin" />Demo läuft…</>
+                ) : (
+                  <><Play size={15} />Demo-Lauf starten</>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsObsDemoMode((current) => !current)}
+                className={`flex items-center justify-center gap-2 rounded-xl border px-4 py-2.5 font-mono text-[11px] font-semibold transition ${isObsDemoMode
+                  ? 'border-[rgba(210,255,77,0.38)] bg-[rgba(42,54,10,0.72)] text-[#d2ff4d]'
+                  : 'border-[rgba(114,228,255,0.16)] bg-[rgba(7,14,28,0.72)] text-[#8ea6c3] hover:text-[#72e4ff]'}`}
+                title="Stille visuelle Moderation fuer OBS-Bildschirmaufnahme aktivieren"
+              >
+                <Camera size={13} />
+                OBS Demo Assistenz {isObsDemoMode ? 'aktiv' : 'starten'}
+              </button>
+            </div>
           </div>
+
+          {isObsDemoMode && (
+            <div className="grid gap-3 rounded-[18px] border border-[rgba(210,255,77,0.22)] bg-[rgba(12,20,10,0.58)] p-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+              <div className="space-y-2">
+                <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#d2ff4d]">Stille Moderation fuer Hackathon-Video</div>
+                <h3 className="font-mono text-base font-semibold text-[#f3f8ff]">{demoNarrationStep.title}</h3>
+                <p className="text-xs leading-relaxed text-[#b9c98c]">{demoNarrationStep.body}</p>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-4">
+                {(['concept', 'grounding', 'render', 'zip'] as DemoNarrationStepId[]).map((stepId) => {
+                  const step = DEMO_NARRATION_STEPS[stepId];
+                  const active = demoNarrationStep.id === stepId || (stepId === 'zip' && (demoNarrationStep.id === 'done' || demoNarrationStep.id === 'zip'));
+                  return (
+                    <div key={stepId} className={`rounded-xl border px-3 py-2 ${active
+                      ? 'border-[rgba(210,255,77,0.38)] bg-[rgba(42,54,10,0.68)] text-[#d2ff4d]'
+                      : 'border-[rgba(114,228,255,0.12)] bg-[rgba(5,12,24,0.62)] text-[#4a7090]'}`}
+                    >
+                      <div className="font-mono text-[9px] uppercase tracking-[0.16em]">{step.kicker}</div>
+                      <div className="mt-1 font-mono text-[10px] font-semibold leading-tight">{step.title}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {demoRun.status !== 'idle' && (
             <div className="flex flex-wrap items-center gap-2">
@@ -2353,7 +2532,7 @@ export default function StillframeHarness() {
           )}
 
           {scenes.length > 0 && (
-            <div className="flex flex-wrap items-center gap-3 rounded-[16px] border border-[rgba(232,193,106,0.16)] bg-[rgba(42,28,6,0.36)] px-4 py-3">
+            <div ref={demoZipSectionRef} className={`scroll-mt-24 flex flex-wrap items-center gap-3 rounded-[16px] border border-[rgba(232,193,106,0.16)] bg-[rgba(42,28,6,0.36)] px-4 py-3 transition ${demoFocusClass('zip')}`}>
               <div className="min-w-0 flex-1">
                 <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#ffd980]">Szenen-ZIP</div>
                 <div className="mt-1 text-xs text-[#b9a06d]">
@@ -2374,7 +2553,7 @@ export default function StillframeHarness() {
 
           {/* Live Pipeline Log */}
           {pipelineLog.length > 0 && (
-            <div className="rounded-[16px] border border-[rgba(114,228,255,0.14)] bg-[rgba(3,8,18,0.85)] p-3 space-y-2">
+            <div ref={demoLogSectionRef} className={`scroll-mt-24 rounded-[16px] border border-[rgba(114,228,255,0.14)] bg-[rgba(3,8,18,0.85)] p-3 space-y-2 transition ${demoFocusClass('log')}`}>
               <div className="flex flex-wrap items-center gap-2">
                 <Terminal size={13} className="text-[#72e4ff]" />
                 <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#72e4ff]">Live Pipeline Log</span>
@@ -3527,7 +3706,7 @@ export default function StillframeHarness() {
 
         {/* ── Scene beat cards ──────────────────────────────────────────────── */}
         {scenes.length > 0 && (
-          <div className="space-y-5">
+          <div ref={demoResultsSectionRef} className={`scroll-mt-24 space-y-5 rounded-[24px] transition ${isObsDemoMode ? 'p-2' : ''} ${demoFocusClass('results')}`}>
             {/* Foundry IQ Spotlight */}
             {sceneIqEntries.length > 0 && (
               <div className="rounded-[20px] border border-[rgba(114,228,255,0.16)] bg-[rgba(6,16,30,0.78)] p-4 space-y-3">
@@ -3666,17 +3845,34 @@ export default function StillframeHarness() {
 
       </main>
 
-      {/* Floating Demo-Generatoren (GIF / Videos) nur in der Werkstatt */}
-      {studioView === 'werkstatt' && (
-        <>
-          <Suspense fallback={null}>
-            <RandomGifGenerator />
-          </Suspense>
-          <Suspense fallback={null}>
-            <RandomVideoGenerator />
-          </Suspense>
-        </>
+      {isObsDemoMode && studioView === 'demo' && (
+        <aside className="fixed bottom-5 right-5 z-40 w-[min(420px,calc(100vw-2rem))] rounded-[20px] border border-[rgba(210,255,77,0.32)] bg-[rgba(4,8,14,0.92)] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.48)] backdrop-blur-xl">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[rgba(210,255,77,0.28)] bg-[rgba(42,54,10,0.62)] text-[#d2ff4d]">
+              {demoNarrationStep.id === 'done' ? <CheckCircle2 size={18} /> : demoNarrationStep.id === 'error' ? <TriangleAlert size={18} /> : <Camera size={18} />}
+            </div>
+            <div className="min-w-0 space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#d2ff4d]">{demoNarrationStep.kicker}</span>
+                {activeDemoStage && (
+                  <span className="rounded-full border border-[rgba(114,228,255,0.16)] bg-[rgba(10,26,46,0.68)] px-2 py-0.5 font-mono text-[9px] text-[#72e4ff]">
+                    {DEMO_STAGE_LABELS[activeDemoStage]}
+                  </span>
+                )}
+              </div>
+              <h3 className="font-mono text-sm font-semibold leading-snug text-[#f3f8ff]">{demoNarrationStep.title}</h3>
+              <p className="text-xs leading-relaxed text-[#b9c98c]">{demoNarrationStep.body}</p>
+              <div className="flex flex-wrap items-center gap-2 font-mono text-[10px] text-[#6f8050]">
+                <span>{completedGifCount}/4 GIF-Loops</span>
+                <span>·</span>
+                <span>{pipelineLog.length} Log-Eintraege</span>
+                {demoZipExportedAt && <><span>·</span><span>ZIP heruntergeladen</span></>}
+              </div>
+            </div>
+          </div>
+        </aside>
       )}
+
     </div>
   );
 }
