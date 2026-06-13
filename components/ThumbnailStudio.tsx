@@ -198,11 +198,26 @@ export default function ThumbnailStudio() {
         setBackground(data.background);
         if (data.background.imageDataUrl) {
           setUploadedBackground(null);
+          const overlay = concept.textOverlay;
+          const renderLayout = { ...overlay, localOverlay: 'none' as const };
+          const renderData = await postJson<{ render: ThumbnailRenderResult }>('/api/thumbnail-studio/render', {
+            backgroundDataUrl: data.background.imageDataUrl,
+            title: concept.selectedTitle,
+            subtitle: overlay.subtitle,
+            topline: overlay.topline,
+            footer: overlay.footer,
+            streamNumber: overlay.streamNumber,
+            layout: renderLayout,
+            outputFormat: 'png',
+            sessionId: sessionId || undefined,
+          });
+          setRender(renderData.render);
+          flashNotice('Thumbnail mit Titel generiert.');
         } else {
           flashNotice(data.background.note);
         }
       }),
-    [concept, flashNotice, run],
+    [concept, flashNotice, run, sessionId],
   );
 
   const handleRender = useCallback(
@@ -212,6 +227,9 @@ export default function ThumbnailStudio() {
           throw new Error('Bitte zuerst ein Konzept generieren.');
         }
         const overlay = concept.textOverlay;
+        const renderLayout = background?.provider === 'foundry'
+          ? { ...overlay, localOverlay: 'none' as const }
+          : overlay;
         const data = await postJson<{ render: ThumbnailRenderResult }>('/api/thumbnail-studio/render', {
           backgroundDataUrl: uploadedBackground || background?.imageDataUrl || undefined,
           title: concept.selectedTitle,
@@ -219,7 +237,7 @@ export default function ThumbnailStudio() {
           topline: overlay.topline,
           footer: overlay.footer,
           streamNumber: overlay.streamNumber,
-          layout: overlay,
+          layout: renderLayout,
           outputFormat: 'png',
           sessionId: sessionId || undefined,
         });

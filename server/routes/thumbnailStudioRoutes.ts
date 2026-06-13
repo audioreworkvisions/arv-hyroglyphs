@@ -114,11 +114,11 @@ const normalizeTextOverlayPatch = (value: unknown): Partial<ThumbnailTextOverlay
   }
   const draft = value as Record<string, unknown>;
   const patch: Partial<ThumbnailTextOverlayConfig> = {};
-  if (asNonEmptyString(draft.topline)) patch.topline = String(draft.topline);
-  if (asNonEmptyString(draft.mainTitle)) patch.mainTitle = String(draft.mainTitle);
-  if (asNonEmptyString(draft.subtitle)) patch.subtitle = String(draft.subtitle);
-  if (asNonEmptyString(draft.footer)) patch.footer = String(draft.footer);
-  if (asNonEmptyString(draft.streamNumber)) patch.streamNumber = String(draft.streamNumber);
+  if (typeof draft.topline === 'string') patch.topline = draft.topline;
+  if (typeof draft.mainTitle === 'string') patch.mainTitle = draft.mainTitle;
+  if (typeof draft.subtitle === 'string') patch.subtitle = draft.subtitle;
+  if (typeof draft.footer === 'string') patch.footer = draft.footer;
+  if (typeof draft.streamNumber === 'string') patch.streamNumber = draft.streamNumber;
   if (asNonEmptyString(draft.fontStyle)) patch.fontStyle = String(draft.fontStyle);
   if (asNonEmptyString(draft.colorLogic)) patch.colorLogic = String(draft.colorLogic);
   const textStyle = asNonEmptyString(draft.textStyle);
@@ -390,6 +390,7 @@ export const createThumbnailStudioRoutes = () => {
           colorLogic: overlay.colorLogic || 'off-white title with cyan/amber accents',
           textStyle: overlay.textStyle || 'arv-transmission',
           icons: overlay.icons && overlay.icons.length > 0 ? overlay.icons : ['peace', 'heart', 'vinyl'],
+          localOverlay: overlay.localOverlay || 'minimal',
         },
         foundryIqSources: Array.isArray(card.foundryIqSources)
           ? card.foundryIqSources.map((entry) => String(entry)).filter(Boolean).slice(0, 12)

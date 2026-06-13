@@ -183,7 +183,7 @@ const buildCreativeDecision = (
     whyLayout: `Layout: ${layout}`,
     whyPalette: `Palette ${palette.join(', ')} was derived from the analyzed ARV reference profile and Foundry IQ palette guidance.`,
     whyLocalText: shouldGenerateTitleInImage(input.thumbnailMode)
-      ? 'The final thumbnail prompt asks the image model to compose the exact simple title together with the background. The local renderer only exports the image and does not add the large old overlay.'
+      ? 'The final thumbnail prompt asks the image model to compose the exact simple title together with the background. The local renderer exports that generated image without adding a second title overlay.'
       : 'Background-only mode keeps local text available as a small fallback, but the normal final thumbnail mode avoids the large overlay.',
     usedIqRules,
     avoidedPatterns,

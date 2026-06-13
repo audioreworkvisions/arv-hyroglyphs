@@ -149,11 +149,14 @@ interface OverlayParams {
   streamNumber: string;
   textStyle: ThumbnailTextStyle;
   icons: Array<'peace' | 'heart' | 'vinyl'>;
+  overlayMode: 'minimal' | 'full';
 }
 
 const buildOverlaySvg = (params: OverlayParams): string => {
   const palette = STYLE_PALETTES[params.textStyle] || STYLE_PALETTES['arv-transmission'];
-  const { fontSize, lines } = fitTitle(params.title || 'UNTITLED');
+  const fitted = fitTitle(params.title || 'UNTITLED');
+  const fontSize = params.overlayMode === 'minimal' ? Math.min(fitted.fontSize, 88) : fitted.fontSize;
+  const lines = splitTitleIntoLines(params.title || 'UNTITLED', fontSize, SAFE_WIDTH, 3);
   const lineHeight = fontSize * 1.05;
   const titleBlockHeight = lines.length * lineHeight;
   const centerY = HEIGHT * 0.56;
@@ -167,31 +170,31 @@ const buildOverlaySvg = (params: OverlayParams): string => {
     .join('\n');
 
   const topY = 150;
-  const toplineMarkup = params.topline
+  const toplineMarkup = params.overlayMode === 'full' && params.topline
     ? `<text x="${WIDTH / 2}" y="${topY}" text-anchor="middle" font-family="${FONT_STACK}" font-size="52" font-weight="800" letter-spacing="16" fill="${palette.accent}">${escapeXml(params.topline.toUpperCase())}</text>
        <line x1="${MARGIN_X}" y1="${topY + 34}" x2="${WIDTH - MARGIN_X}" y2="${topY + 34}" stroke="${palette.line}" stroke-width="4" opacity="0.8" />`
     : '';
 
   const subtitleY = titleStartY + titleBlockHeight + 70;
-  const subtitleMarkup = params.subtitle
+  const subtitleMarkup = params.overlayMode === 'full' && params.subtitle
     ? `<text x="${WIDTH / 2}" y="${subtitleY}" text-anchor="middle" font-family="${FONT_STACK}" font-size="58" font-weight="700" letter-spacing="6" fill="${palette.secondaryAccent}">${escapeXml(params.subtitle.toUpperCase())}</text>`
     : '';
 
   const footerY = HEIGHT - 90;
-  const footerMarkup = params.footer
+  const footerMarkup = params.overlayMode === 'full' && params.footer
     ? `<text x="${WIDTH / 2}" y="${footerY}" text-anchor="middle" font-family="${FONT_STACK}" font-size="50" font-weight="800" letter-spacing="14" fill="${palette.title}">${escapeXml(params.footer.toUpperCase())}</text>`
     : '';
 
-  const streamMarkup = params.streamNumber
+  const streamMarkup = params.overlayMode === 'full' && params.streamNumber
     ? `<text x="${WIDTH - MARGIN_X}" y="${topY}" text-anchor="end" font-family="${FONT_STACK}" font-size="64" font-weight="900" fill="${palette.accent}">#${escapeXml(params.streamNumber)}</text>`
     : '';
 
   const iconY = footerY - 64;
   const iconSpacing = 80;
   const iconStartX = WIDTH / 2 - ((params.icons.length - 1) * iconSpacing) / 2;
-  const iconsMarkup = params.icons
+  const iconsMarkup = params.overlayMode === 'full' ? params.icons
     .map((icon, index) => buildIconMarkup(icon, iconStartX + index * iconSpacing, iconY, palette.secondaryAccent))
-    .join('\n');
+    .join('\n') : '';
 
   return `<svg width="${WIDTH}" height="${HEIGHT}" viewBox="0 0 ${WIDTH} ${HEIGHT}" xmlns="http://www.w3.org/2000/svg">
   <defs>
@@ -201,7 +204,7 @@ const buildOverlaySvg = (params: OverlayParams): string => {
       <stop offset="100%" stop-color="#000000" stop-opacity="0.7" />
     </linearGradient>
   </defs>
-  <rect x="0" y="0" width="${WIDTH}" height="${HEIGHT}" fill="url(#titleScrim)" opacity="0.45" />
+  <rect x="0" y="0" width="${WIDTH}" height="${HEIGHT}" fill="url(#titleScrim)" opacity="${params.overlayMode === 'minimal' ? '0.22' : '0.45'}" />
   ${toplineMarkup}
   ${streamMarkup}
   ${titleSpans}
@@ -269,6 +272,7 @@ export const renderThumbnail = async (
     .resize(WIDTH, HEIGHT, { fit: 'cover', position: 'centre' })
     .toBuffer();
 
+  const overlayMode = layout.localOverlay === 'full' ? 'full' : 'minimal';
   const shouldApplyOverlay = layout.localOverlay !== 'none';
   const overlaySvg = shouldApplyOverlay ? buildOverlaySvg({
     title: request.title || layout.mainTitle || 'UNTITLED',
@@ -278,6 +282,7 @@ export const renderThumbnail = async (
     streamNumber: request.streamNumber ?? layout.streamNumber ?? '',
     textStyle: layout.textStyle || 'arv-transmission',
     icons: layout.icons && layout.icons.length > 0 ? layout.icons : ['peace', 'heart', 'vinyl'],
+    overlayMode,
   }) : null;
 
   const composited = overlaySvg

@@ -9,6 +9,28 @@ interface ThumbnailConceptPanelProps {
 
 const cardClass = 'space-y-2 rounded-xl border border-zinc-800 bg-zinc-950/60 p-4';
 const headingClass = 'text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500';
+const SEO_KEYWORD_MAX_LENGTH = 400;
+
+const buildSeoKeywordLine = (keywords: string[]): string => {
+  const cleanKeywords = keywords
+    .map((keyword) => keyword.trim())
+    .filter((keyword) => keyword.length > 0);
+  const line = cleanKeywords.join(', ');
+  if (line.length <= SEO_KEYWORD_MAX_LENGTH) {
+    return line;
+  }
+
+  const parts: string[] = [];
+  for (const keyword of cleanKeywords) {
+    const candidate = [...parts, keyword].join(', ');
+    if (candidate.length > SEO_KEYWORD_MAX_LENGTH) {
+      break;
+    }
+    parts.push(keyword);
+  }
+
+  return parts.join(', ');
+};
 
 function ChipList({ items, tone = 'cyan' }: { items: string[]; tone?: 'cyan' | 'amber' | 'zinc' }) {
   const toneClass =
@@ -34,6 +56,7 @@ export default function ThumbnailConceptPanel({ concept }: ThumbnailConceptPanel
   }
 
   const decision = concept.creativeDecision;
+  const seoKeywordLine = buildSeoKeywordLine(concept.seoKeywords);
 
   return (
     <section className="space-y-4">
@@ -107,7 +130,14 @@ export default function ThumbnailConceptPanel({ concept }: ThumbnailConceptPanel
             <ChipList items={concept.hashtags} tone="cyan" />
           </div>
           <div className={cardClass}>
-            <h4 className={headingClass}>SEO Keywords</h4>
+            <div className="flex items-center justify-between gap-2">
+              <h4 className={headingClass}>SEO Keywords</h4>
+              <CopyButton value={seoKeywordLine} label="Copy SEO" />
+            </div>
+            <p className="break-words font-mono text-[11px] leading-relaxed text-zinc-500">
+              {seoKeywordLine || '—'}
+            </p>
+            <p className="text-[10px] text-zinc-600">{seoKeywordLine.length} / {SEO_KEYWORD_MAX_LENGTH} Zeichen</p>
             <ChipList items={concept.seoKeywords} tone="zinc" />
           </div>
         </div>
