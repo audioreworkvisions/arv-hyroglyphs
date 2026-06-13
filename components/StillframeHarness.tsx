@@ -345,6 +345,11 @@ const truncateForLog = (text: string, max = 160): string => {
   return clean.length > max ? `${clean.slice(0, max - 1)}…` : clean;
 };
 
+const truncateForPreview = (text: string, max = 280): string => {
+  const clean = text.replace(/\s+/g, ' ').trim();
+  return clean.length > max ? `${clean.slice(0, max - 1)}…` : clean;
+};
+
 // Group templates by category for the dropdown
 const TEMPLATE_OPTIONS = PROMPT_TEMPLATES.reduce<{ category: string; options: { id: string; label: string; prompt: string }[] }[]>(
   (acc, t) => {
@@ -681,6 +686,8 @@ export default function StillframeHarness() {
   const [isSavingStoryMemory, setIsSavingStoryMemory] = useState(false);
   const [isSyncingStoryMemory, setIsSyncingStoryMemory] = useState(false);
   const [storyMemoryMessage, setStoryMemoryMessage] = useState<string | null>(null);
+  const [isCompactSceneCards, setIsCompactSceneCards] = useState(true);
+  const [satireLayoutMode, setSatireLayoutMode] = useState<'single' | 'split'>('single');
   const [isPreparingReferences, setIsPreparingReferences] = useState(false);
   const [conceptError, setConceptError] = useState<string | null>(null);
   const [referenceError, setReferenceError] = useState<string | null>(null);
@@ -2049,7 +2056,7 @@ export default function StillframeHarness() {
   }, [isSyncingStoryMemory, pushPipelineLog, storyMemories.length]);
 
   useEffect(() => {
-    if (studioView === 'manual-demo' && !hasRequestedInitialStoryMemoryLoadRef.current) {
+    if ((studioView === 'manual-demo' || studioView === 'werkstatt') && !hasRequestedInitialStoryMemoryLoadRef.current) {
       hasRequestedInitialStoryMemoryLoadRef.current = true;
       void loadStoryMemories();
     }
@@ -2277,8 +2284,8 @@ export default function StillframeHarness() {
     return () => window.clearTimeout(timeout);
   }, [demoRun.finishedAt, demoRun.status, demoZipExportedAt, handleDownloadStoryZip, isDownloadingStoryZip, isObsDemoMode, pushPipelineLog]);
 
-  const scrollToPanel = useCallback((target: 'ideas' | 'stillframe') => {
-    const targetRef = target === 'ideas' ? ideaSectionRef : stillframeSectionRef;
+  const scrollToPanel = useCallback((target: 'stillframe') => {
+    const targetRef = stillframeSectionRef;
 
     targetRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, []);
@@ -2335,16 +2342,6 @@ export default function StillframeHarness() {
           <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-[rgba(114,228,255,0.12)] bg-[rgba(7,14,28,0.78)] px-2 py-2">
             <button
               type="button"
-              onClick={() => {
-                setStudioView('werkstatt');
-                window.requestAnimationFrame(() => scrollToPanel('ideas'));
-              }}
-              className="rounded-xl border border-[rgba(168,118,255,0.18)] bg-[rgba(30,16,54,0.64)] px-3 py-2 font-mono text-[10px] font-semibold text-[#c7a7ff] transition hover:border-[rgba(168,118,255,0.34)]"
-            >
-              Ideen
-            </button>
-            <button
-              type="button"
               onClick={() => handleWorkspaceChange('stillframe')}
               className="rounded-xl border border-[rgba(114,228,255,0.16)] bg-[rgba(10,26,46,0.6)] px-3 py-2 font-mono text-[10px] font-semibold text-[#8ea6c3] transition hover:text-[#72e4ff]"
             >
@@ -2398,9 +2395,10 @@ export default function StillframeHarness() {
             <h1 className="font-mono text-2xl font-bold tracking-tight text-[#f3f8ff]">
               {GENERATION_MODE_LABELS[generationMode]}
             </h1>
-            <p className="text-sm text-[#4a6a8a] max-w-2xl">
-              {GENERATION_MODE_DESCRIPTIONS[generationMode]}
-            </p>
+            <div className="rounded-[16px] border border-[rgba(114,228,255,0.12)] bg-[rgba(6,12,24,0.62)] p-3 text-xs text-[#8ea6c3]">
+              <div className="font-mono uppercase tracking-[0.14em] text-[10px] text-[#72e4ff]">Werkstatt-Ablauf</div>
+              <div className="mt-1">1) Modus und Prompt wählen · 2) Story + 4 Szenen generieren · 3) Szenen einzeln polieren/rendern · 4) optional ZIP exportieren.</div>
+            </div>
           </div>
         )}
 
@@ -2852,152 +2850,118 @@ export default function StillframeHarness() {
         </section>
         )}
 
-        {studioView === 'werkstatt' && (
-        <section ref={ideaSectionRef} className="scroll-mt-24 rounded-[24px] border border-[rgba(168,118,255,0.16)] bg-[linear-gradient(180deg,rgba(22,12,40,0.72),rgba(7,12,24,0.8))] p-5 space-y-5 backdrop-blur-sm">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="space-y-2 max-w-3xl">
-              <div className="font-mono text-[11px] uppercase tracking-[0.24em] text-[#8f74c9]">
-                Ideen Generator
-              </div>
-              <h2 className="font-mono text-xl font-semibold text-[#f3eaff]">
-                Neue Visionen fuer Themen, Figuren, Ereignisse, Stories, Styles, Prompt- und Preset-Seeds
-              </h2>
-              <p className="text-sm leading-relaxed text-[#907aa8]">
-                Generiert immer wieder neue ARV-Ideenpakete fuer kommende Musikvideos und Livestreams, die sofort kopiert oder direkt in Ritual-Concepts und Satire-Fokusfelder uebernommen werden koennen. Vorhandene Keywords und editierte Referenz-DNA wirken als weiche Stilanker mit, damit jede Idee zur Kanal-Aesthetik passt.
-              </p>
-            </div>
-
-            {ideaPack?.clipboardText && (
-              <div className="flex flex-wrap items-center gap-2">
-                <CopyTextButton
-                  text={ideaPack.clipboardText}
-                  label="Alles kopieren"
-                  copiedLabel="Pack kopiert"
-                />
-                <button
-                  type="button"
-                  onClick={() => void handleSaveIdeaPack()}
-                  disabled={isSavingIdeaPack}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[rgba(114,228,255,0.18)] bg-[rgba(10,26,46,0.72)] px-3 py-2 font-mono text-[10px] font-semibold text-[#72e4ff] transition hover:bg-[rgba(18,38,64,0.82)] disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  {isSavingIdeaPack ? <Loader2 size={12} className="animate-spin" /> : <BookOpen size={12} />}
-                  {isSavingIdeaPack ? 'Speichert...' : 'In Bibliothek speichern'}
-                </button>
-              </div>
-            )}
-          </div>
-
-          {ideaPackSaveMessage && (
-            <div className={`rounded-lg border px-4 py-3 font-mono text-[11px] ${ideaPackSaveMessage.includes('gespeichert')
-              ? 'border-[rgba(114,228,255,0.16)] bg-[rgba(10,26,46,0.56)] text-[#72e4ff]'
-              : 'border-[rgba(255,80,60,0.2)] bg-[rgba(255,80,60,0.1)] text-[#ff6a4f]'}`}>
-              {ideaPackSaveMessage}
-            </div>
-          )}
-
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)]">
-            <div className="space-y-3">
-              <label className="block font-mono text-[11px] uppercase tracking-[0.22em] text-[#8f74c9]">
-                Ideen-Seed
-              </label>
-              <textarea
-                value={ideaSeed}
-                onChange={(event) => setIdeaSeed(event.target.value)}
-                rows={3}
-                placeholder={generationMode === 'satire'
-                  ? 'z. B. pressure-core office meltdown, glass engine with procedural panic, signal field doing dry visual comedy'
-                  : generationMode === 'signal'
-                    ? 'z. B. black CRT barcode breathing once, cyan-magenta orbital frame locking into a central dot'
-                    : 'z. B. breathing storm lab above black water, micro-city under magnetic weather, kinetic aperture with delayed residue'}
-                className="w-full resize-none rounded-xl border border-[rgba(168,118,255,0.18)] bg-[rgba(10,10,24,0.82)] px-4 py-3 font-mono text-sm text-[#f3eaff] placeholder-[#4d4162] outline-none transition focus:border-[rgba(199,167,255,0.55)] focus:ring-1 focus:ring-[rgba(199,167,255,0.24)]"
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' && !event.shiftKey) {
-                    event.preventDefault();
-                    void handleGenerateIdeas();
-                  }
-                }}
-              />
-            </div>
-
-            <div className="rounded-[18px] border border-[rgba(168,118,255,0.14)] bg-[rgba(12,14,28,0.78)] p-4 space-y-3">
-              <div className="font-mono text-[11px] uppercase tracking-[0.2em] text-[#705d92]">Generator Status</div>
-              <div className="space-y-2 font-mono text-[11px] leading-relaxed text-[#8f74c9]">
-                <div>Modus: <span className="text-[#f3eaff]">{GENERATION_MODE_STATUS_LABELS[generationMode]}</span></div>
-                <div>Keywords: <span className="text-[#c7a7ff]">{keywords.length > 0 ? keywords.join(', ') : 'keine'}</span></div>
-                <div>Referenz-DNA: <span className="text-[#c7a7ff]">{referenceStyle ? 'aktiv' : 'keine'}</span></div>
-                <div>Seed: <span className="text-[#c7a7ff]">{ideaSeed.trim() || 'frischer Lauf ohne expliziten Seed'}</span></div>
-              </div>
-              <button
-                type="button"
-                onClick={() => void handleGenerateIdeas()}
-                disabled={isGeneratingIdeas}
-                className="flex w-full items-center justify-center gap-2 rounded-xl border border-[rgba(168,118,255,0.24)] bg-[rgba(48,24,78,0.82)] px-4 py-3 font-mono text-[11px] font-semibold text-[#e6d6ff] transition hover:bg-[rgba(62,28,96,0.88)] disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {isGeneratingIdeas ? (
-                  <><Loader2 size={14} className="animate-spin" />Visionen werden gebaut…</>
-                ) : (
-                  <><Sparkles size={14} />Neue Ideen generieren</>
-                )}
-              </button>
-            </div>
-          </div>
-
-          {ideasError && (
-            <div className="flex items-start gap-2 rounded-lg border border-[rgba(255,80,60,0.2)] bg-[rgba(255,80,60,0.1)] px-4 py-3 text-xs text-[#ff6a4f]">
-              <TriangleAlert size={14} className="mt-0.5 shrink-0" />
-              {ideasError}
-            </div>
-          )}
-
-          {ideaPack && (
-            <div className="space-y-5">
-              <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
-                {IDEA_SECTION_CONFIG.map((section) => (
-                  <IdeaListPanel
-                    key={section.key}
-                    label={section.label}
-                    items={ideaPack[section.key]}
-                    allowUse={section.useTarget}
-                    onUseRitual={applyIdeaToRitual}
-                    onUseSatire={applyIdeaToSatire}
-                    onUseSignal={applyIdeaToSignal}
-                  />
-                ))}
-              </div>
-
-              {ideaPack.visions.length > 0 && (
-                <div className="space-y-3">
-                  <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-[#8f74c9]">
-                    Vision Cards
-                  </div>
-                  <div className="grid gap-4 xl:grid-cols-2">
-                    {ideaPack.visions.map((vision, index) => (
-                      <IdeaVisionCard
-                        key={`${vision.title}-${index}`}
-                        vision={vision}
-                        onUseRitual={applyIdeaToRitual}
-                        onUseSatire={applyIdeaToSatire}
-                        onUseSignal={applyIdeaToSignal}
-                        onGenerateRitual={handleGenerateVisionRitual}
-                        onGenerateSatire={handleGenerateVisionSatire}
-                        onGenerateSignal={handleGenerateVisionSignal}
-                        isGenerating={isGeneratingConcept}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </section>
-        )}
-
         {/* ── Compose + Storyboard (two-column studio) ─────────────────────── */}
         <div ref={stillframeSectionRef} className={`grid scroll-mt-24 gap-6 ${studioView === 'werkstatt' ? 'xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] xl:items-start' : ''}`}>
 
         {/* Left column · Compose controls (nur Werkstatt) */}
         {studioView === 'werkstatt' && (
         <div className="space-y-6 xl:sticky xl:top-6">
+
+        <details className="rounded-[18px] border border-[rgba(114,228,255,0.14)] bg-[rgba(4,12,24,0.72)] p-4" open={false}>
+          <summary className="cursor-pointer font-mono text-[11px] uppercase tracking-[0.2em] text-[#72e4ff]">
+            Story Memory & IQ Sync
+          </summary>
+          <div className="mt-3 space-y-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0 space-y-1">
+              <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-[#72e4ff]">Foundry IQ Story Memory</div>
+              <p className="max-w-3xl text-xs leading-relaxed text-[#8ea6c3]">
+                Werkstatt-Pipeline fuer story.md: Storys mit Szenenprompts und Style-Cards abrufen, speichern, wiederverwenden und mit Foundry IQ synchronisieren.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void loadStoryMemories()}
+                disabled={isLoadingStoryMemories}
+                className="inline-flex items-center gap-2 rounded-xl border border-[rgba(114,228,255,0.18)] bg-[rgba(10,26,46,0.72)] px-3 py-2 font-mono text-[10px] font-semibold text-[#72e4ff] transition hover:bg-[rgba(18,38,64,0.82)] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {isLoadingStoryMemories ? <Loader2 size={12} className="animate-spin" /> : <Database size={12} />}
+                Memory abrufen
+              </button>
+              {scenes.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => void handleSaveStoryMemory(selectedStoryMemory?.id ?? null)}
+                  disabled={isSavingStoryMemory}
+                  className="inline-flex items-center gap-2 rounded-xl border border-[rgba(141,240,180,0.2)] bg-[rgba(10,40,24,0.56)] px-3 py-2 font-mono text-[10px] font-semibold text-[#8df0b4] transition hover:bg-[rgba(14,52,30,0.68)] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {isSavingStoryMemory ? <Loader2 size={12} className="animate-spin" /> : <BookOpen size={12} />}
+                  Als story.md speichern
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => void handleSyncStoryMemory()}
+                disabled={isSyncingStoryMemory || storyMemories.length === 0}
+                title={storyMemories.length === 0 ? 'Speichere zuerst eine Story-Memory als story.md.' : 'Gespeicherte story.md Dateien mit Foundry IQ synchronisieren'}
+                className="inline-flex items-center gap-2 rounded-xl border border-[rgba(232,193,106,0.24)] bg-[rgba(42,28,6,0.72)] px-3 py-2 font-mono text-[10px] font-semibold text-[#ffd980] transition hover:bg-[rgba(58,38,8,0.82)] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {isSyncingStoryMemory ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                Mit Foundry IQ syncen
+              </button>
+            </div>
+          </div>
+
+          {storyMemories.length > 0 && (
+            <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
+              <label className="space-y-2">
+                <span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#4a7090]">Gespeicherte Story</span>
+                <div className="relative">
+                  <select
+                    value={selectedStoryMemoryId}
+                    onChange={(event) => setSelectedStoryMemoryId(event.target.value)}
+                    aria-label="Gespeicherte Story-Memory auswählen"
+                    className="w-full appearance-none rounded-xl border border-[rgba(114,228,255,0.18)] bg-[#071221] px-4 py-3 pr-9 font-mono text-[11px] text-[#c8ddf0] outline-none transition focus:border-[#72e4ff]"
+                  >
+                    {storyMemories.map((memory) => (
+                      <option key={memory.id} value={memory.id}>
+                        {memory.title} · {memory.scenes.length} Szenen · {new Date(memory.updatedAt).toLocaleDateString('de-DE')}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronsDown size={13} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#4a7090]" />
+                </div>
+              </label>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => selectedStoryMemory && applyStoryMemoryToEditor(selectedStoryMemory)}
+                  disabled={!selectedStoryMemory}
+                  className="inline-flex items-center gap-2 rounded-xl border border-[rgba(114,228,255,0.18)] bg-[rgba(10,26,46,0.72)] px-3 py-3 font-mono text-[10px] font-semibold text-[#72e4ff] transition hover:bg-[rgba(18,38,64,0.82)] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <Copy size={12} />
+                  Wiederverwenden
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleContinueStoryMemory()}
+                  disabled={!selectedStoryMemory || isGeneratingConcept}
+                  className="inline-flex items-center gap-2 rounded-xl border border-[rgba(232,193,106,0.24)] bg-[rgba(42,28,6,0.72)] px-3 py-3 font-mono text-[10px] font-semibold text-[#ffd980] transition hover:bg-[rgba(58,38,8,0.82)] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {isGeneratingConcept ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                  Fortsetzen
+                </button>
+              </div>
+            </div>
+          )}
+
+          {selectedStoryMemory && (
+            <div className="rounded-[14px] border border-[rgba(114,228,255,0.1)] bg-[rgba(3,8,18,0.72)] px-3 py-3 font-mono text-[10px] leading-relaxed text-[#8ea6c3]">
+              <span className="text-[#72e4ff]">Aktive Memory:</span> {selectedStoryMemory.storyConcept || selectedStoryMemory.sourcePrompt || selectedStoryMemory.title}
+              {selectedStoryMemory.referenceStyle?.summary ? <> · <span className="text-[#ffd980]">Style:</span> {selectedStoryMemory.referenceStyle.summary}</> : null}
+            </div>
+          )}
+
+          {storyMemoryMessage && (
+            <div className={`rounded-lg border px-4 py-3 font-mono text-[10px] leading-relaxed ${/fehl|failed|error/i.test(storyMemoryMessage)
+              ? 'border-[rgba(255,80,60,0.2)] bg-[rgba(255,80,60,0.1)] text-[#ff6a4f]'
+              : 'border-[rgba(114,228,255,0.14)] bg-[rgba(10,26,46,0.56)] text-[#72e4ff]'}`}>
+              {storyMemoryMessage}
+            </div>
+          )}
+          </div>
+        </details>
 
         {/* ── Concept input ─────────────────────────────────────────────────── */}
         <div className="rounded-[24px] border border-[rgba(114,228,255,0.12)] bg-[rgba(6,12,24,0.7)] p-6 space-y-4 backdrop-blur-sm">
@@ -3458,8 +3422,32 @@ export default function StillframeHarness() {
             </>
           ) : (
             <>
-              <div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
-                <div className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[rgba(114,228,255,0.12)] bg-[rgba(6,14,28,0.78)] px-3 py-2">
+                <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#4a7090]">Satire Layout</span>
+                <div className="inline-flex items-center gap-1 rounded-lg border border-[rgba(114,228,255,0.14)] bg-[rgba(7,14,28,0.82)] p-1">
+                  <button
+                    type="button"
+                    onClick={() => setSatireLayoutMode('single')}
+                    className={`rounded-md px-3 py-1.5 font-mono text-[10px] font-semibold transition ${satireLayoutMode === 'single'
+                      ? 'border border-[rgba(114,228,255,0.28)] bg-[rgba(18,38,64,0.9)] text-[#72e4ff]'
+                      : 'border border-transparent text-[#4a7090] hover:text-[#8ea6c3]'}`}
+                  >
+                    Einspaltig
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSatireLayoutMode('split')}
+                    className={`rounded-md px-3 py-1.5 font-mono text-[10px] font-semibold transition ${satireLayoutMode === 'split'
+                      ? 'border border-[rgba(168,118,255,0.28)] bg-[rgba(38,20,64,0.9)] text-[#c7a7ff]'
+                      : 'border border-transparent text-[#4a7090] hover:text-[#8ea6c3]'}`}
+                  >
+                    Zweispaltig
+                  </button>
+                </div>
+              </div>
+
+              <div className={`grid gap-4 ${satireLayoutMode === 'split' ? 'xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]' : ''}`}>
+                <div className="min-w-0 space-y-3">
                   <label className="block font-mono text-[11px] uppercase tracking-[0.22em] text-[#4a7090]">
                     Satire-Fokus
                   </label>
@@ -3481,8 +3469,8 @@ export default function StillframeHarness() {
                   </p>
                 </div>
 
-                <div className="grid gap-4 lg:grid-cols-[minmax(260px,0.85fr)_minmax(0,1.15fr)]">
-                  <div className="rounded-[18px] border border-[rgba(114,228,255,0.12)] bg-[rgba(8,16,30,0.82)] p-4 space-y-3">
+                <div className={`grid min-w-0 gap-4 ${satireLayoutMode === 'split' ? 'lg:grid-cols-[minmax(260px,0.85fr)_minmax(0,1.15fr)]' : ''}`}>
+                  <div className="min-w-0 rounded-[18px] border border-[rgba(114,228,255,0.12)] bg-[rgba(8,16,30,0.82)] p-4 space-y-3">
                     <label className="block font-mono text-[11px] uppercase tracking-[0.22em] text-[#4a7090]">
                       Voreinstellung
                     </label>
@@ -3513,7 +3501,7 @@ export default function StillframeHarness() {
                     </div>
                   </div>
 
-                  <div className="rounded-[18px] border border-[rgba(114,228,255,0.12)] bg-[rgba(8,16,30,0.82)] p-4 space-y-4">
+                  <div className="min-w-0 rounded-[18px] border border-[rgba(114,228,255,0.12)] bg-[rgba(8,16,30,0.82)] p-4 space-y-4">
                     <label className="block font-mono text-[11px] uppercase tracking-[0.22em] text-[#4a7090]">
                       Elemente
                     </label>
@@ -3551,7 +3539,7 @@ export default function StillframeHarness() {
                   </div>
                 </div>
 
-                <div className="space-y-3">
+                <div className={`space-y-3 ${satireLayoutMode === 'split' ? 'xl:col-span-2' : ''}`}>
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <label className="font-mono text-[11px] uppercase tracking-[0.22em] text-[#4a7090]">
                       Referenzbilder PNG / GIF
@@ -3734,20 +3722,47 @@ export default function StillframeHarness() {
                   ))}
                 </div>
                 {iqCitations.length > 0 && (
-                  <div className="grid gap-2 md:grid-cols-2">
-                    {iqCitations.slice(0, 6).map((citation) => (
-                      <div key={citation.source} className="rounded-lg border border-[rgba(114,228,255,0.08)] bg-[rgba(4,10,20,0.72)] p-3">
-                        <div className="truncate font-mono text-[10px] uppercase tracking-[0.14em] text-[#72e4ff]">{citation.source}</div>
-                        <div className="mt-1 text-[10px] leading-relaxed text-[#8ea6c3]">{citation.excerpt}</div>
-                      </div>
-                    ))}
-                  </div>
+                  <details className="rounded-lg border border-[rgba(114,228,255,0.1)] bg-[rgba(4,10,20,0.62)] px-3 py-2">
+                    <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-[0.16em] text-[#8ea6c3]">
+                      Quellen anzeigen ({iqCitations.length})
+                    </summary>
+                    <div className="mt-2 grid gap-2 md:grid-cols-2">
+                      {iqCitations.slice(0, 8).map((citation) => (
+                        <div key={`${citation.source}-${citation.excerpt.slice(0, 24)}`} className="rounded-lg border border-[rgba(114,228,255,0.08)] bg-[rgba(4,10,20,0.72)] p-3">
+                          <div className="truncate font-mono text-[10px] uppercase tracking-[0.14em] text-[#72e4ff]">{citation.source}</div>
+                          <div className="mt-1 text-[10px] leading-relaxed text-[#8ea6c3]">{citation.excerpt}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
                 )}
               </div>
             )}
 
             {/* Batch actions */}
             <div className="flex flex-wrap items-center gap-3">
+              {studioView === 'werkstatt' && (
+                <div className="inline-flex items-center gap-1 rounded-xl border border-[rgba(114,228,255,0.14)] bg-[rgba(6,14,28,0.82)] p-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsCompactSceneCards(true)}
+                    className={`rounded-lg px-3 py-1.5 font-mono text-[10px] font-semibold transition ${isCompactSceneCards
+                      ? 'border border-[rgba(114,228,255,0.3)] bg-[rgba(18,38,64,0.9)] text-[#72e4ff]'
+                      : 'border border-transparent text-[#4a7090] hover:text-[#8ea6c3]'}`}
+                  >
+                    Kompakt
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsCompactSceneCards(false)}
+                    className={`rounded-lg px-3 py-1.5 font-mono text-[10px] font-semibold transition ${!isCompactSceneCards
+                      ? 'border border-[rgba(168,118,255,0.3)] bg-[rgba(38,20,64,0.9)] text-[#c7a7ff]'
+                      : 'border border-transparent text-[#4a7090] hover:text-[#8ea6c3]'}`}
+                  >
+                    Detail
+                  </button>
+                </div>
+              )}
               <button
                 type="button"
                 onClick={handlePolishAll}
@@ -3806,6 +3821,7 @@ export default function StillframeHarness() {
                   key={`${scene.beat}-${index}`}
                   scene={scene}
                   index={index}
+                  compact={studioView === 'werkstatt' && isCompactSceneCards}
                   onPromptChange={handlePromptChange}
                   onTransformPromptChange={handleVideoTransformPromptChange}
                   onDurationChange={handleDurationChange}
@@ -3883,6 +3899,7 @@ interface SceneCardProps {
   scene: SceneState;
   index: number;
   runId: string;
+  compact?: boolean;
   onPromptChange: (index: number, value: string) => void;
   onTransformPromptChange: (index: number, value: string) => void;
   onDurationChange: (index: number, value: number) => void;
@@ -3893,7 +3910,7 @@ interface SceneCardProps {
   onVideoExtension: (index: number) => void;
 }
 
-function SceneCard({ scene, index, runId, onPromptChange, onTransformPromptChange, onDurationChange, onPolish, onSketch, onVideo, onVideoRemix, onVideoExtension }: SceneCardProps) {
+function SceneCard({ scene, index, runId, compact = false, onPromptChange, onTransformPromptChange, onDurationChange, onPolish, onSketch, onVideo, onVideoRemix, onVideoExtension }: SceneCardProps) {
   const beatLabel = BEAT_LABELS[scene.beat] ?? `Beat ${index + 1}`;
   const beatColorClass = BEAT_COLORS[scene.beat] ?? 'bg-zinc-800/60 text-zinc-300 border-zinc-700/50';
   const cardRingClass = BEAT_RING[scene.beat] ?? 'border-zinc-700/40';
@@ -3902,10 +3919,10 @@ function SceneCard({ scene, index, runId, onPromptChange, onTransformPromptChang
 
   return (
     <article
-      className={`flex flex-col rounded-[20px] border bg-[rgba(6,12,24,0.72)] backdrop-blur-sm overflow-hidden ${cardRingClass}`}
+      className={`flex flex-col border bg-[rgba(6,12,24,0.72)] backdrop-blur-sm overflow-hidden ${compact ? 'rounded-[16px]' : 'rounded-[20px]'} ${cardRingClass}`}
     >
       {/* Card header */}
-      <div className="border-b border-[rgba(255,255,255,0.05)] px-4 py-3 flex items-center gap-2">
+      <div className={`border-b border-[rgba(255,255,255,0.05)] flex items-center gap-2 ${compact ? 'px-3 py-2' : 'px-4 py-3'}`}>
         <span
           className={`rounded-full border px-2.5 py-0.5 font-mono text-[10px] font-semibold tracking-widest ${beatColorClass}`}
         >
@@ -3915,13 +3932,13 @@ function SceneCard({ scene, index, runId, onPromptChange, onTransformPromptChang
       </div>
 
       {/* Motion description */}
-      <div className="px-4 pt-3 pb-1">
-        <p className="font-mono text-[10px] italic text-[#2a4a6a] leading-relaxed">
+      <div className={compact ? 'px-3 pt-2 pb-1' : 'px-4 pt-3 pb-1'}>
+        <p className={`font-mono text-[10px] italic text-[#2a4a6a] ${compact ? 'truncate' : 'leading-relaxed'}`}>
           {scene.motion}
         </p>
       </div>
 
-      <div className="px-4 pt-3">
+      <div className={compact ? 'px-3 pt-2' : 'px-4 pt-3'}>
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-[rgba(232,169,74,0.12)] bg-[rgba(22,16,6,0.48)] px-3 py-2 font-mono text-[10px] text-[#b9a06d]">
           <span className="uppercase tracking-[0.16em] text-[#8a6a30]">Video</span>
           <div className="inline-flex rounded-md border border-[rgba(232,169,74,0.16)] bg-[#040d1a] p-0.5" role="group" aria-label={`Videolaenge fuer Szene ${index + 1}`}>
@@ -3936,23 +3953,22 @@ function SceneCard({ scene, index, runId, onPromptChange, onTransformPromptChang
                     ? 'bg-[rgba(232,169,74,0.24)] text-[#f6d58f] shadow-[0_0_16px_rgba(232,169,74,0.18)]'
                     : 'text-[#8a6a30] hover:bg-[rgba(232,169,74,0.1)] hover:text-[#d0ae6a]'
                   }`}
-                  aria-pressed={isActive}
                 >
                   {duration}s
                 </button>
               );
             })}
           </div>
-          <span>720p · Sora: 4/8/12s · Standard {DEFAULT_VIDEO_DURATION_SECONDS}s</span>
+          {!compact && <span>720p · Sora: 4/8/12s · Standard {DEFAULT_VIDEO_DURATION_SECONDS}s</span>}
         </div>
       </div>
 
       {/* Prompt textarea */}
-      <div className="px-4 py-2 flex-1">
+      <div className={`${compact ? 'px-3 py-2' : 'px-4 py-2'} flex-1`}>
         <textarea
           value={scene.prompt}
           onChange={(e) => onPromptChange(index, e.target.value)}
-          rows={6}
+          rows={compact ? 3 : 6}
           className="w-full resize-none rounded-lg border border-[rgba(114,228,255,0.12)] bg-[#040d1a] px-3 py-2 font-mono text-[11px] text-[#c8ddf0] placeholder-[#1a3050] outline-none focus:border-[rgba(114,228,255,0.3)] transition leading-relaxed"
           placeholder="Generation prompt…"
         />
@@ -3979,7 +3995,7 @@ function SceneCard({ scene, index, runId, onPromptChange, onTransformPromptChang
       )}
 
       {/* Action row */}
-      <div className="grid grid-cols-5 gap-2 px-4 pb-4 pt-1">
+      <div className={`grid grid-cols-5 gap-2 ${compact ? 'px-3 pb-3 pt-1' : 'px-4 pb-4 pt-1'}`}>
         <button
           type="button"
           onClick={() => onPolish(index)}
@@ -4095,23 +4111,11 @@ function SceneCard({ scene, index, runId, onPromptChange, onTransformPromptChang
               </div>
             )}
             <div>
-              <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#36516e]">Rohprompt</div>
-              <pre className="mt-2 whitespace-pre-wrap rounded-lg border border-[rgba(114,228,255,0.08)] bg-[#040d1a] px-3 py-2 font-mono text-[10px] leading-relaxed text-[#8ea6c3] overflow-x-auto">
-                {scene.renderPromptDebug.rawPrompt}
-              </pre>
-            </div>
-            <div>
-              <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#36516e]">Bereinigter Prompt-Core</div>
-              <pre className="mt-2 whitespace-pre-wrap rounded-lg border border-[rgba(114,228,255,0.12)] bg-[rgba(10,24,42,0.86)] px-3 py-2 font-mono text-[10px] leading-relaxed text-[#c8ddf0] overflow-x-auto">
-                {scene.renderPromptDebug.cleanedPrompt}
-              </pre>
-            </div>
-            <div>
               <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#36516e]">
                 {scene.renderPromptDebug.target === 'video' ? 'Finaler Sora-2 Prompt' : 'Finaler Modellprompt'}
               </div>
               <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-lg border border-[rgba(168,118,255,0.12)] bg-[rgba(20,14,34,0.82)] px-3 py-2 font-mono text-[10px] leading-relaxed text-[#d8c2ff]">
-                {scene.renderPromptDebug.finalPrompt}
+                {truncateForPreview(scene.renderPromptDebug.finalPrompt)}
               </pre>
             </div>
             {(scene.renderPromptDebug.renderMode || scene.renderPromptDebug.sourceVideoId || scene.renderPromptDebug.resultVideoId) && (
@@ -4131,28 +4135,62 @@ function SceneCard({ scene, index, runId, onPromptChange, onTransformPromptChang
                     {scene.renderPromptDebug.iqBrief.citations.length} Quelle(n)
                   </span>
                 </div>
-                <div>
-                  <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#36516e]">IQ-Abfrage</div>
-                  <pre className="mt-2 max-h-36 overflow-auto whitespace-pre-wrap rounded-lg border border-[rgba(114,228,255,0.1)] bg-[rgba(3,8,16,0.72)] px-3 py-2 font-mono text-[10px] leading-relaxed text-[#8ea6c3]">
-                    {scene.renderPromptDebug.iqBrief.query}
-                  </pre>
-                </div>
                 <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#36516e]">Verwendeter IQ-Block im finalen Prompt</div>
                 <pre className="max-h-56 overflow-auto whitespace-pre-wrap rounded-lg border border-[rgba(114,228,255,0.12)] bg-[rgba(3,8,16,0.72)] px-3 py-2 font-mono text-[10px] leading-relaxed text-[#c8ddf0]">
-                  {scene.renderPromptDebug.iqBrief.promptBlock}
+                  {truncateForPreview(scene.renderPromptDebug.iqBrief.promptBlock)}
                 </pre>
                 {scene.renderPromptDebug.iqBrief.citations.length > 0 && (
-                  <div className="space-y-2">
-                    {scene.renderPromptDebug.iqBrief.citations.map((citation) => (
-                      <div key={`${citation.source}-${citation.excerpt.slice(0, 24)}`} className="rounded-lg border border-[rgba(114,228,255,0.08)] bg-[rgba(5,12,24,0.72)] p-3">
-                        <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#72e4ff]">{citation.source}</div>
-                        <div className="mt-1 text-[10px] leading-relaxed text-[#8ea6c3]">{citation.excerpt}</div>
-                      </div>
-                    ))}
-                  </div>
+                  <details className="rounded-lg border border-[rgba(114,228,255,0.1)] bg-[rgba(3,8,16,0.64)] px-3 py-2">
+                    <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-[0.16em] text-[#8ea6c3]">
+                      IQ-Quellen anzeigen ({scene.renderPromptDebug.iqBrief.citations.length})
+                    </summary>
+                    <div className="mt-2 space-y-2">
+                      {scene.renderPromptDebug.iqBrief.citations.map((citation) => (
+                        <div key={`${citation.source}-${citation.excerpt.slice(0, 24)}`} className="rounded-lg border border-[rgba(114,228,255,0.08)] bg-[rgba(5,12,24,0.72)] p-3">
+                          <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#72e4ff]">{citation.source}</div>
+                          <div className="mt-1 text-[10px] leading-relaxed text-[#8ea6c3]">{citation.excerpt}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
                 )}
               </div>
             )}
+            <details className="rounded-lg border border-[rgba(114,228,255,0.08)] bg-[rgba(3,8,16,0.62)] px-3 py-2">
+              <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-[0.16em] text-[#8ea6c3]">
+                Rohdaten anzeigen
+              </summary>
+              <div className="mt-2 grid gap-2">
+                <div>
+                  <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#36516e]">Rohprompt</div>
+                  <pre className="mt-2 whitespace-pre-wrap rounded-lg border border-[rgba(114,228,255,0.08)] bg-[#040d1a] px-3 py-2 font-mono text-[10px] leading-relaxed text-[#8ea6c3] overflow-x-auto">
+                    {scene.renderPromptDebug.rawPrompt}
+                  </pre>
+                </div>
+                <div>
+                  <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#36516e]">Bereinigter Prompt-Core</div>
+                  <pre className="mt-2 whitespace-pre-wrap rounded-lg border border-[rgba(114,228,255,0.12)] bg-[rgba(10,24,42,0.86)] px-3 py-2 font-mono text-[10px] leading-relaxed text-[#c8ddf0] overflow-x-auto">
+                    {scene.renderPromptDebug.cleanedPrompt}
+                  </pre>
+                </div>
+                {scene.renderPromptDebug.iqBrief && (
+                  <div>
+                    <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#36516e]">IQ-Abfrage</div>
+                    <pre className="mt-2 max-h-36 overflow-auto whitespace-pre-wrap rounded-lg border border-[rgba(114,228,255,0.1)] bg-[rgba(3,8,16,0.72)] px-3 py-2 font-mono text-[10px] leading-relaxed text-[#8ea6c3]">
+                      {scene.renderPromptDebug.iqBrief.query}
+                    </pre>
+                  </div>
+                )}
+                <div>
+                  <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#36516e]">
+                    Voller finaler Prompt
+                  </div>
+                  <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-lg border border-[rgba(168,118,255,0.12)] bg-[rgba(20,14,34,0.82)] px-3 py-2 font-mono text-[10px] leading-relaxed text-[#d8c2ff]">
+                    {scene.renderPromptDebug.finalPrompt}
+                  </pre>
+                </div>
+              </div>
+            </details>
             {(scene.renderPromptDebug.stylePresetIds.length > 0 || scene.renderPromptDebug.referenceStyleSummary) && (
               <div className="space-y-2">
                 {scene.renderPromptDebug.stylePresetIds.length > 0 && (

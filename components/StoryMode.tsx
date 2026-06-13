@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader2, Download, Wand2, Play, CheckCircle2, AlertCircle, Film, RefreshCw, Cpu, ChevronsDown } from 'lucide-react';
+import { Loader2, Download, Wand2, Play, CheckCircle2, AlertCircle, Film, RefreshCw, Cpu, ChevronsDown, BookOpen, Database, Copy } from 'lucide-react';
 import { CURATED_PRESET_IDS, CURATED_PRESETS, PRESETS } from '../lib/presets';
 import {
   CURATED_STORY_IDENT_TEMPLATE_IDS,
@@ -49,6 +49,8 @@ interface StoryModeProps {
   preloadedStoryboard?: ARVStorySequence | null;
   onAzureUsage?: (entry: Omit<AzureUsageEntry, 'id' | 'timestamp'>) => void;
   embedded?: boolean;
+  externalPromptValue?: string;
+  onExternalPromptApplied?: () => void;
 }
 
 type SaveFilePickerWindow = Window & typeof globalThis & {
@@ -133,6 +135,48 @@ type SceneRenderError = Error & {
     videoTransformMode?: VideoTransformMode | null;
   };
   debug?: VideoPromptDebug | null;
+};
+
+type StoryMemoryCardScene = {
+  index: number;
+  beat: string;
+  title: string;
+  prompt: string;
+  motion: string;
+  durationSeconds?: number;
+  videoId?: string | null;
+  remixedFromVideoId?: string | null;
+  videoTransformMode?: 'remix' | 'extend' | null;
+};
+
+type StoryMemoryCard = {
+  type: 'stillframe_story_memory';
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  title: string;
+  sourcePrompt: string;
+  storyConcept: string;
+  continuationOf?: string | null;
+  referenceStyle?: {
+    summary?: string;
+    subjectFocus?: string;
+    palette?: string;
+    motion?: string;
+    promptDNA?: string;
+    keywords?: string[];
+  } | null;
+  stylePresets: Array<{
+    id: string;
+    name: string;
+    visualIdentity?: string;
+    colorPalette?: string;
+    lighting?: string;
+    motionStyle?: string;
+    shortPrompt?: string;
+  }>;
+  scenes: StoryMemoryCardScene[];
+  notes?: string;
 };
 
 const parseApiJsonResponse = async <T extends StoryModeApiPayload>(response: Response) => {
@@ -227,7 +271,17 @@ const buildARVBackedStory = (
   })),
 });
 
-export default function StoryMode({ model, setModel, saveToLibrary, onStorySaved, preloadedStoryboard, onAzureUsage, embedded = false }: StoryModeProps) {
+export default function StoryMode({
+  model,
+  setModel,
+  saveToLibrary,
+  onStorySaved,
+  preloadedStoryboard,
+  onAzureUsage,
+  embedded = false,
+  externalPromptValue,
+  onExternalPromptApplied,
+}: StoryModeProps) {
   const [prompt, setPrompt] = useState('');
   const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
   const [isPresetEnabled, setIsPresetEnabled] = useState(false);
@@ -251,9 +305,16 @@ export default function StoryMode({ model, setModel, saveToLibrary, onStorySaved
   const [rewritingSceneIds, setRewritingSceneIds] = useState<Set<string>>(new Set());
   const [editingSceneIds, setEditingSceneIds] = useState<Set<string>>(new Set());
   const [isDownloadingZip, setIsDownloadingZip] = useState(false);
+  const [storyMemories, setStoryMemories] = useState<StoryMemoryCard[]>([]);
+  const [selectedStoryMemoryId, setSelectedStoryMemoryId] = useState('');
+  const [isLoadingStoryMemories, setIsLoadingStoryMemories] = useState(false);
+  const [isSavingStoryMemory, setIsSavingStoryMemory] = useState(false);
+  const [isSyncingStoryMemory, setIsSyncingStoryMemory] = useState(false);
+  const [storyMemoryMessage, setStoryMemoryMessage] = useState<string | null>(null);
   const storyLibrarySnapshotRef = useRef<{ id: string; createdAt: number } | null>(null);
 
   const isAnyGenerating = generatingSceneIds.size > 0;
+  const selectedStoryMemory = storyMemories.find((memory) => memory.id === selectedStoryMemoryId) || null;
   const storyPromptTemplates = filterPromptTemplates(getPromptTemplates('story'), promptTemplateSearch);
   const curatedStoryIdentTemplates = storyPromptTemplates.filter((template) => CURATED_STORY_IDENT_TEMPLATE_ID_SET.has(template.id));
   const curatedStoryWorldTemplates = storyPromptTemplates.filter((template) => CURATED_STORY_WORLD_TEMPLATE_ID_SET.has(template.id));
@@ -279,6 +340,192 @@ export default function StoryMode({ model, setModel, saveToLibrary, onStorySaved
 
   const resetStoryLibrarySnapshot = () => {
     storyLibrarySnapshotRef.current = null;
+  };
+
+  const loadStoryMemories = async () => {
+    setIsLoadingStoryMemories(true);
+    setStoryMemoryMessage(null);
+
+    try {
+      const res = await fetch('/api/stillframe/story-memory');
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Story memory lookup failed.');
+      }
+
+      const memories = Array.isArray(data.memories) ? data.memories as StoryMemoryCard[] : [];
+      setStoryMemories(memories);
+      if (!selectedStoryMemoryId && memories[0]?.id) {
+        setSelectedStoryMemoryId(memories[0].id);
+      }
+      setStoryMemoryMessage(memories.length > 0
+        ? `${memories.length} Story-Memory-Datei(en) geladen.`
+        : 'Noch keine gespeicherten Story-Memories vorhanden.');
+    } catch (err: any) {
+      setStoryMemoryMessage(err?.message || 'Story-Memory konnte nicht geladen werden.');
+    } finally {
+      setIsLoadingStoryMemories(false);
+    }
+  };
+
+  const buildStoryMemoryPayload = (): StoryMemoryCard | null => {
+    if (!story || story.scenes.length === 0) {
+      return null;
+    }
+
+    const activeStylePreset = activePreset
+      ? {
+        id: activePreset.id,
+        name: activePreset.name,
+        visualIdentity: activePreset.visualIdentity,
+        colorPalette: activePreset.colorPalette,
+        lighting: activePreset.lighting,
+        motionStyle: activePreset.motionStyle,
+        shortPrompt: activePreset.shortPrompt,
+      }
+      : {
+        id: story.presetId || 'story-composer',
+        name: story.presetName || 'Story Composer',
+        visualIdentity: story.visualDNA,
+        colorPalette: story.colorPalette,
+        motionStyle: story.motionGrammar,
+        shortPrompt: story.mainMotif,
+      };
+
+    const now = new Date().toISOString();
+    return {
+      type: 'stillframe_story_memory',
+      id: `story-memory-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+      createdAt: now,
+      updatedAt: now,
+      title: story.title || prompt.trim().slice(0, 80) || 'Story Composer Memory',
+      sourcePrompt: prompt.trim(),
+      storyConcept: story.settingDescription || prompt.trim(),
+      continuationOf: selectedStoryMemory?.id ?? null,
+      referenceStyle: {
+        summary: story.visualDNA || story.tone || 'Story Composer visual language',
+        subjectFocus: story.mainMotif || story.settingDescription || '',
+        palette: story.colorPalette || '',
+        motion: story.motionGrammar || '',
+        promptDNA: story.negativePrompt || '',
+        keywords: [],
+      },
+      stylePresets: [activeStylePreset],
+      scenes: story.scenes.map((scene, index) => ({
+        index: index + 1,
+        beat: scene.sceneBeat,
+        title: scene.action || `Szene ${index + 1}`,
+        prompt: scene.finalPrompt || scene.gifSpecification,
+        motion: scene.motionDescription || scene.continuityNotes,
+        videoId: scene.videoId ?? null,
+        remixedFromVideoId: scene.remixedFromVideoId ?? null,
+        videoTransformMode: scene.videoTransformMode ?? null,
+      })),
+      notes: 'Saved from Story GIF Composer for Foundry IQ retrieval and continuation.',
+    };
+  };
+
+  const handleSaveStoryMemory = async () => {
+    const memoryCard = buildStoryMemoryPayload();
+    if (!memoryCard || isSavingStoryMemory) {
+      return;
+    }
+
+    setIsSavingStoryMemory(true);
+    setStoryMemoryMessage(null);
+    try {
+      const res = await fetch('/api/stillframe/story-memory/write', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ memoryCard }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Story memory write failed.');
+      }
+
+      const saved = data.memoryCard as StoryMemoryCard;
+      setStoryMemories((previous) => [saved, ...previous.filter((memory) => memory.id !== saved.id)]);
+      setSelectedStoryMemoryId(saved.id);
+      setStoryMemoryMessage(`Story-Memory gespeichert: ${data.markdownPath}.`);
+    } catch (err: any) {
+      setStoryMemoryMessage(err?.message || 'Story-Memory konnte nicht gespeichert werden.');
+    } finally {
+      setIsSavingStoryMemory(false);
+    }
+  };
+
+  const handleSyncStoryMemory = async () => {
+    if (isSyncingStoryMemory) {
+      return;
+    }
+
+    if (storyMemories.length === 0) {
+      setStoryMemoryMessage('Noch keine gespeicherte story.md vorhanden. Speichere zuerst eine Story-Memory.');
+      return;
+    }
+
+    setIsSyncingStoryMemory(true);
+    setStoryMemoryMessage(null);
+    try {
+      const res = await fetch('/api/stillframe/story-memory/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ includeStylePack: false, recreateKnowledgeBase: false }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Story memory sync failed.');
+      }
+
+      setStoryMemoryMessage(`Foundry-IQ Sync abgeschlossen: ${data.markdownCount ?? 0} Story-Memory-Datei(en) hochgeladen.`);
+    } catch (err: any) {
+      setStoryMemoryMessage(err?.message || 'Foundry-IQ Sync konnte nicht ausgeführt werden.');
+    } finally {
+      setIsSyncingStoryMemory(false);
+    }
+  };
+
+  const applyStoryMemoryToComposer = (memory: StoryMemoryCard) => {
+    const promptSeed = memory.sourcePrompt || memory.storyConcept || memory.title;
+    setPrompt(promptSeed);
+
+    const mappedScenes = memory.scenes.slice(0, 4).map((scene, index) => ({
+      id: `memory-${memory.id}-${index}`,
+      sceneBeat: getStorySceneBeatByIndex(index),
+      action: scene.title || `Szene ${index + 1}`,
+      motionDescription: scene.motion || 'n/a',
+      continuityNotes: scene.motion || 'n/a',
+      gifSpecification: scene.prompt,
+      finalPrompt: scene.prompt,
+      status: 'pending' as const,
+      videoId: scene.videoId ?? null,
+      remixedFromVideoId: scene.remixedFromVideoId ?? null,
+      videoTransformMode: scene.videoTransformMode ?? null,
+    }));
+
+    if (mappedScenes.length === 0) {
+      setStoryMemoryMessage(`Story-Memory „${memory.title}“ geladen.`);
+      return;
+    }
+
+    const previewStory: StorySequence = {
+      title: memory.title,
+      settingDescription: memory.storyConcept || promptSeed,
+      characterDefinition: 'Story Memory Restore',
+      tone: memory.referenceStyle?.summary || 'Story Memory Tone',
+      presetId: memory.stylePresets[0]?.id || 'story-memory',
+      presetName: memory.stylePresets[0]?.name || 'Story Memory',
+      storyArcMode: 'iconic',
+      mainMotif: memory.referenceStyle?.subjectFocus || memory.storyConcept,
+      visualDNA: memory.referenceStyle?.summary || undefined,
+      colorPalette: memory.referenceStyle?.palette || undefined,
+      motionGrammar: memory.referenceStyle?.motion || undefined,
+      scenes: mappedScenes,
+    };
+
+    applyStoryToEditor(previewStory);
+    setStoryMemoryMessage(`Story-Memory „${memory.title}“ in den Composer geladen.`);
   };
 
   const getStoryLibrarySnapshot = () => {
@@ -612,6 +859,15 @@ export default function StoryMode({ model, setModel, saveToLibrary, onStorySaved
   useEffect(() => {
     setStoryboardEngine(model);
   }, [model]);
+
+  useEffect(() => {
+    if (!externalPromptValue) {
+      return;
+    }
+
+    setPrompt(externalPromptValue);
+    onExternalPromptApplied?.();
+  }, [externalPromptValue, onExternalPromptApplied]);
 
   const handleGenerateStory = async () => {
     if (!prompt.trim()) return;
@@ -1321,6 +1577,83 @@ export default function StoryMode({ model, setModel, saveToLibrary, onStorySaved
                 }`}
               >
                 <span>{isPresetEnabled ? 'AN' : 'AUS'}</span>
+
+            <div className="rounded-xl border border-sky-200/70 bg-sky-50/70 p-4 dark:border-sky-900/40 dark:bg-sky-950/20 space-y-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="text-[11px] uppercase tracking-[0.18em] text-sky-600 dark:text-sky-300 font-semibold">Foundry IQ Story Memory</div>
+                  <div className="mt-1 text-xs text-stone-600 dark:text-stone-300">
+                    Abrufen, als story.md speichern und mit Foundry IQ synchronisieren - inklusive Szenenprompts und Style-Cards.
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void loadStoryMemories()}
+                    disabled={isLoadingStoryMemories}
+                    className="inline-flex items-center gap-2 rounded-lg border border-sky-300 bg-white px-3 py-2 text-xs font-semibold text-sky-700 transition hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-sky-900/60 dark:bg-zinc-900 dark:text-sky-300"
+                  >
+                    {isLoadingStoryMemories ? <Loader2 size={12} className="animate-spin" /> : <Database size={12} />}
+                    Memory abrufen
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleSaveStoryMemory()}
+                    disabled={!story || isSavingStoryMemory}
+                    className="inline-flex items-center gap-2 rounded-lg border border-emerald-300 bg-white px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-900/60 dark:bg-zinc-900 dark:text-emerald-300"
+                  >
+                    {isSavingStoryMemory ? <Loader2 size={12} className="animate-spin" /> : <BookOpen size={12} />}
+                    Als story.md speichern
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleSyncStoryMemory()}
+                    disabled={isSyncingStoryMemory || storyMemories.length === 0}
+                    className="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-amber-900/60 dark:bg-zinc-900 dark:text-amber-300"
+                  >
+                    {isSyncingStoryMemory ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                    Mit Foundry IQ syncen
+                  </button>
+                </div>
+              </div>
+
+              {storyMemories.length > 0 && (
+                <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+                  <label className="space-y-1.5">
+                    <span className="text-[11px] uppercase tracking-[0.16em] text-stone-500 dark:text-stone-400 font-semibold">Gespeicherte Story</span>
+                    <select
+                      value={selectedStoryMemoryId}
+                      onChange={(event) => setSelectedStoryMemoryId(event.target.value)}
+                      className="w-full rounded-xl border border-stone-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-4 py-2.5 text-sm"
+                      aria-label="Gespeicherte Story-Memory auswählen"
+                    >
+                      {storyMemories.map((memory) => (
+                        <option key={memory.id} value={memory.id}>
+                          {memory.title} · {memory.scenes.length} Szenen · {new Date(memory.updatedAt).toLocaleDateString('de-DE')}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => selectedStoryMemory && applyStoryMemoryToComposer(selectedStoryMemory)}
+                    disabled={!selectedStoryMemory}
+                    className="inline-flex items-center gap-2 rounded-xl border border-stone-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-2.5 text-xs font-semibold text-stone-700 dark:text-stone-200 transition hover:border-sky-300 dark:hover:border-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Copy size={12} />
+                    In Composer laden
+                  </button>
+                </div>
+              )}
+
+              {storyMemoryMessage && (
+                <div className={`rounded-lg border px-3 py-2 text-xs ${/fehl|failed|error/i.test(storyMemoryMessage)
+                  ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-300'
+                  : 'border-sky-200 bg-white text-sky-700 dark:border-sky-900/60 dark:bg-zinc-900 dark:text-sky-300'}`}>
+                  {storyMemoryMessage}
+                </div>
+              )}
+            </div>
               </button>
             </div>
             <select

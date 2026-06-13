@@ -90,9 +90,11 @@ export default function ThumbnailConceptPanel({ concept }: ThumbnailConceptPanel
           </div>
         </div>
 
-        <div className={cardClass}>
-          <h4 className={headingClass}>Titelvarianten ({concept.titleVariants.length})</h4>
-          <ul className="space-y-2">
+        <details className={cardClass}>
+          <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
+            Titelvarianten ({concept.titleVariants.length})
+          </summary>
+          <ul className="mt-3 space-y-2">
             {concept.titleVariants.map((variant, index) => (
               <li key={`${variant.title}-${index}`} className="flex items-start justify-between gap-3 border-b border-zinc-800/70 pb-2 last:border-0">
                 <div>
@@ -103,7 +105,7 @@ export default function ThumbnailConceptPanel({ concept }: ThumbnailConceptPanel
               </li>
             ))}
           </ul>
-        </div>
+        </details>
 
         <div className={cardClass}>
           <div className="flex items-center justify-between gap-2">
@@ -129,7 +131,10 @@ export default function ThumbnailConceptPanel({ concept }: ThumbnailConceptPanel
             </div>
             <ChipList items={concept.hashtags} tone="cyan" />
           </div>
-          <div className={cardClass}>
+          <details className={cardClass}>
+            <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
+              SEO Keywords ({concept.seoKeywords.length})
+            </summary>
             <div className="flex items-center justify-between gap-2">
               <h4 className={headingClass}>SEO Keywords</h4>
               <CopyButton value={seoKeywordLine} label="Copy SEO" />
@@ -139,7 +144,7 @@ export default function ThumbnailConceptPanel({ concept }: ThumbnailConceptPanel
             </p>
             <p className="text-[10px] text-zinc-600">{seoKeywordLine.length} / {SEO_KEYWORD_MAX_LENGTH} Zeichen</p>
             <ChipList items={concept.seoKeywords} tone="zinc" />
-          </div>
+          </details>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -153,36 +158,42 @@ export default function ThumbnailConceptPanel({ concept }: ThumbnailConceptPanel
           </div>
         </div>
 
-        <div className={cardClass}>
-          <div className="flex items-center justify-between gap-2">
+        <details className={cardClass}>
+          <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
+            Prompt & Render-Details
+          </summary>
+          <div className="mt-3 flex items-center justify-between gap-2">
             <h4 className={headingClass}>Finalbild-Prompt (Titel + Hintergrund)</h4>
             <CopyButton value={concept.backgroundPrompt} label="Copy Prompt" />
           </div>
           <pre className="whitespace-pre-wrap text-xs text-zinc-400">{concept.backgroundPrompt}</pre>
-        </div>
 
-        <div className={cardClass}>
-          <h4 className={headingClass}>Negative Prompt</h4>
-          <p className="text-xs text-zinc-400">{concept.negativePrompt}</p>
-        </div>
-
-        <div className={cardClass}>
-          <h4 className={headingClass}>Titel-Render-Modus</h4>
-          <div className="grid gap-1 text-xs text-zinc-400 sm:grid-cols-2">
-            <span>Topline: <span className="text-zinc-200">{concept.textOverlay.topline}</span></span>
-            <span>Footer: <span className="text-zinc-200">{concept.textOverlay.footer}</span></span>
-            <span>Subtitle: <span className="text-zinc-200">{concept.textOverlay.subtitle || '—'}</span></span>
-            <span>Stream #: <span className="text-zinc-200">{concept.textOverlay.streamNumber || '—'}</span></span>
-            <span>Style: <span className="text-zinc-200">{concept.textOverlay.textStyle}</span></span>
-            <span>Color: <span className="text-zinc-200">{concept.textOverlay.colorLogic}</span></span>
-            <span>Lokales Overlay: <span className="text-zinc-200">{concept.textOverlay.localOverlay || 'minimal'}</span></span>
+          <div className="mt-3">
+            <h4 className={headingClass}>Negative Prompt</h4>
+            <p className="text-xs text-zinc-400">{concept.negativePrompt}</p>
           </div>
-        </div>
+
+          <div className="mt-3">
+            <h4 className={headingClass}>Titel-Render-Modus</h4>
+            <div className="grid gap-1 text-xs text-zinc-400 sm:grid-cols-2">
+              <span>Topline: <span className="text-zinc-200">{concept.textOverlay.topline}</span></span>
+              <span>Footer: <span className="text-zinc-200">{concept.textOverlay.footer}</span></span>
+              <span>Subtitle: <span className="text-zinc-200">{concept.textOverlay.subtitle || '—'}</span></span>
+              <span>Stream #: <span className="text-zinc-200">{concept.textOverlay.streamNumber || '—'}</span></span>
+              <span>Style: <span className="text-zinc-200">{concept.textOverlay.textStyle}</span></span>
+              <span>Color: <span className="text-zinc-200">{concept.textOverlay.colorLogic}</span></span>
+              <span>Lokales Overlay: <span className="text-zinc-200">{concept.textOverlay.localOverlay || 'minimal'}</span></span>
+            </div>
+          </div>
+        </details>
       </div>
 
-      <div className="space-y-3 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
-        <div className="flex items-center gap-2">
+      <details className="space-y-3 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
+        <summary className="flex cursor-pointer items-center gap-2 text-sm font-semibold uppercase tracking-[0.14em] text-zinc-200">
           <Lightbulb size={18} className="text-amber-400" />
+          Creative Decision Explanation
+        </summary>
+        <div className="flex items-center gap-2">
           <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-zinc-200">Creative Decision Explanation</h3>
         </div>
         <dl className="space-y-2 text-sm">
@@ -207,7 +218,7 @@ export default function ThumbnailConceptPanel({ concept }: ThumbnailConceptPanel
         <p className="text-[11px] text-zinc-500">
           IQ Provider: <span className="text-zinc-300">{decision.iqProvider}</span> · Remote: {decision.usedRemote ? 'yes' : 'no'}
         </p>
-      </div>
+      </details>
 
       <details className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
         <summary className="flex cursor-pointer items-center justify-between text-sm font-semibold uppercase tracking-[0.14em] text-zinc-300">

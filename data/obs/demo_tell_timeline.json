@@ -1,0 +1,133 @@
+{
+  "title": "ARV Hyroglyphs Demo Tell Timeline",
+  "version": 1,
+  "autoStart": false,
+  "cues": [
+    {
+      "id": "intro-stop-prompt-roulette",
+      "title": "Intro: Stop Prompt Roulette",
+      "at": 0,
+      "style": "center",
+      "mode": 0,
+      "show": "Hard cut to clean ARV loop, dark analog archive texture, sparse composition, big text STOP PROMPT ROULETTE.",
+      "message": "Hyroglyphs is a story-first creative AI studio for @audioreworkvisions, built to generate repeatable, coherent visual worlds for techno releases and livestreams."
+    },
+    {
+      "id": "start-with-story",
+      "title": "Start with narrative",
+      "at": 18,
+      "style": "track",
+      "mode": 1,
+      "show": "Screen recording New Release start screen, click Create from Story, overlay Start with narrative not prompts.",
+      "message": "Instead of one-off images, we turn a concept into structured scene beats you can iterate, remix, and extend."
+    },
+    {
+      "id": "audience-framing",
+      "title": "Audience framing",
+      "at": 36,
+      "style": "center",
+      "mode": 2,
+      "show": "Audience slide Built for Hackathon Judges and Builders, subtext Repeatability plus grounding plus proof via demo.",
+      "message": "This demo focuses on end-to-end pipeline, remix continuity, and packaging automation."
+    },
+    {
+      "id": "pipeline-step-1",
+      "title": "Pipeline 1: Concept",
+      "at": 52,
+      "style": "track",
+      "mode": 2,
+      "show": "Demo part 1, Generate or Refine Story Concept panel, concept paragraph appears, overlay 1 Concept.",
+      "message": "Step 1: Generate or refine a story concept for the release."
+    },
+    {
+      "id": "pipeline-step-2",
+      "title": "Pipeline 2: Scene beats",
+      "at": 74,
+      "style": "track",
+      "mode": 3,
+      "show": "Click Break into Scene Beats, structured Beat 1 to Beat 6 list appears, overlay 2 Scene beats.",
+      "message": "Step 2: Convert story into scene beats, a plan you can reuse."
+    },
+    {
+      "id": "pipeline-step-3-grounding",
+      "title": "Pipeline 3: Grounding",
+      "at": 96,
+      "style": "track",
+      "mode": 5,
+      "show": "Grounding view with Foundry IQ and Local ARV Knowledge toggles, overlay Grounded to ARV aesthetic with style bullets.",
+      "message": "Step 3: Ground creative intent using Foundry IQ plus curated channel knowledge so outputs stay on-brand."
+    },
+    {
+      "id": "pipeline-step-4-render",
+      "title": "Pipeline 4: Render",
+      "at": 122,
+      "style": "center",
+      "mode": 7,
+      "show": "Render screen, click Render Scenes, progress indicators, reveal four loopable GIF scenes in a grid, overlay Render to 4 loopable GIFs.",
+      "message": "Step 4: Render stillframes, sketches, and loopable GIF scenes ready for iteration."
+    },
+    {
+      "id": "assemble-slideshow",
+      "title": "Assemble slideshow",
+      "at": 146,
+      "style": "center",
+      "mode": 8,
+      "show": "Click Assemble Slideshow, preview continuous GIF slideshow as visual source, overlay One-click video layer output.",
+      "message": "Result: concept to plan to 4 loops to slideshow, ready for a music video or livestream."
+    },
+    {
+      "id": "remix-open-existing",
+      "title": "Remix flow start",
+      "at": 166,
+      "style": "track",
+      "mode": 1,
+      "show": "Demo part 2, open Existing Release selector and choose a prior release, overlay Remix without losing continuity.",
+      "message": "Now we remix: take an existing release story and scenes and extend the same world."
+    },
+    {
+      "id": "remix-pack",
+      "title": "Remix pack continuity",
+      "at": 188,
+      "style": "track",
+      "mode": 5,
+      "show": "Click Generate Remix Pack, new loops appear beside originals in A/B layout, overlay Continuity preserved.",
+      "message": "Hyroglyphs creates new loops that stay coherent, no restarting from scratch."
+    },
+    {
+      "id": "iteration-flows",
+      "title": "Structured iteration",
+      "at": 208,
+      "style": "center",
+      "mode": 6,
+      "show": "Iteration UI with buttons Remix, Extend Beat, Variant with constraints, overlay Iterate via flows not re-prompts.",
+      "message": "The key shift: iteration is structured. Remix and extend flows replace random re-prompting."
+    },
+    {
+      "id": "thumbnail-studio",
+      "title": "Thumbnail studio",
+      "at": 228,
+      "style": "track",
+      "mode": 3,
+      "show": "Demo part 3, open Thumbnail Studio, generated thumbnail draft with title, description, hashtags, SEO keywords, overlay Packaging grounded to same story.",
+      "message": "Finally, Thumbnail Studio generates the release package: thumbnail, metadata, and SEO, grounded in the same narrative and style."
+    },
+    {
+      "id": "architecture-slide",
+      "title": "System architecture",
+      "at": 248,
+      "style": "center",
+      "mode": 2,
+      "show": "Architecture diagram slide: Inputs Story plus ARV Knowledge plus Foundry IQ to Scene Planner to Renderer to Loop Assembler to Thumbnail Studio.",
+      "message": "Under the hood, this is a repeatable production system: narrative to structure to grounded generation to loop outputs to packaging."
+    },
+    {
+      "id": "impact-slide",
+      "title": "Impact and placeholders",
+      "at": 268,
+      "style": "track",
+      "mode": 0,
+      "show": "Impact slide with tiles Speed, Consistency, Scale and placeholders for hours saved per release, releases per week, iteration count.",
+      "message": "Impact: faster shipping, consistent visual identity, and a workflow that scales beyond ARV to other electronic music channels."
+    }
+  ]
+}

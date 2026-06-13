@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import StoryMode from './StoryMode';
+import StoryIdeasGeneratorPanel from './StoryIdeasGeneratorPanel';
 import type { ARVStorySequence } from '../lib/arvTypes';
 import type { LibraryItem } from '../lib/libraryDB';
 import type { AzureUsageEntry } from '../hooks/useAzureUsage';
@@ -21,9 +22,30 @@ export default function StoryGifComposerPage({
   preloadedStoryboard,
   onAzureUsage,
 }: StoryGifComposerPageProps) {
+  const [externalPromptValue, setExternalPromptValue] = useState<string | undefined>(undefined);
+
+  const handleUsePrompt = useCallback((value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return;
+    }
+
+    setExternalPromptValue(trimmed);
+  }, []);
+
+  const handleExternalPromptApplied = useCallback(() => {
+    setExternalPromptValue(undefined);
+  }, []);
+
   return (
     <div className="min-h-full text-[#f3f8ff]">
       <main className="mx-auto max-w-[1500px] space-y-6 px-4 py-8">
+        <StoryIdeasGeneratorPanel onUsePrompt={handleUsePrompt} />
+
+        <div className="rounded-[16px] border border-[rgba(114,228,255,0.16)] bg-[rgba(8,20,34,0.72)] px-4 py-3 font-mono text-[11px] leading-relaxed text-[#8ea6c3]">
+          Hinweis: Vision Cards sowie Story- und Prompt-Seeds aus dem Ideen-Generator koennen den Story-Prompt direkt vorbefuellen.
+        </div>
+
         <section className="rounded-[24px] border border-[rgba(232,169,74,0.16)] bg-[rgba(8,10,18,0.86)] p-5 backdrop-blur-sm">
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
@@ -49,6 +71,8 @@ export default function StoryGifComposerPage({
               saveToLibrary={saveToLibrary}
               preloadedStoryboard={preloadedStoryboard}
               onAzureUsage={onAzureUsage}
+              externalPromptValue={externalPromptValue}
+              onExternalPromptApplied={handleExternalPromptApplied}
             />
           </div>
         </section>

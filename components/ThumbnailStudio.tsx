@@ -331,6 +331,12 @@ export default function ThumbnailStudio() {
             Generiert Titel, Thema, YouTube-Metadaten und ein finales 16:9-Thumbnail für den nächsten Audioreworkvisions
             Livestream — gestützt auf Azure AI Foundry IQ als Creative Brand Memory.
           </p>
+          <div className="mt-3 grid gap-2 rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 text-xs text-zinc-400 sm:grid-cols-4">
+            <span>1) Referenzen analysieren</span>
+            <span>2) IQ Memory abrufen</span>
+            <span>3) Konzept generieren</span>
+            <span>4) Hintergrund + Render</span>
+          </div>
         </div>
 
         {error && (

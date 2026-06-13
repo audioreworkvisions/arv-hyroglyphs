@@ -66,13 +66,13 @@ The Stillframe Studio is split into three views so the public demo stays focused
 | --- | --- |
 | **Demo Flow** | The curated one-click hackathon path: concept, Foundry IQ grounding, four sequential Sora renders, GIF conversion, pipeline log, scene ZIP export |
 | **Manual Demo** | A guided creator path: simple prompt, PNG/GIF style upload, reference-style extraction, automatic four-scene prompt generation, Story Memory save/load/continue/sync, scene ZIP export |
-| **Werkstatt** | The full workshop: mode selection, idea generator, scene composing, GIF/video demo widgets, deeper prompt and render controls |
+| **Werkstatt** | The full workshop: mode selection, scene composing, GIF/video demo widgets, deeper prompt and render controls |
 
 The split is deliberate: judges can understand the production pipeline quickly, while creators can still move into the workshop for deeper control.
 
 ## One-Click Hackathon Demo Run
 
-The Stillframe Studio opens in a focused **Demo Flow** view (the manual tooling — mode selection, idea generator, scene composing — lives in a separate **Werkstatt** view, toggled in the header). At the top sits the **Agents League · One-Click Demo** panel. A single click runs the full production pipeline end to end — from concept to a broadcast-ready GIF slideshow — and makes the Foundry IQ integration visible while it happens:
+The Stillframe Studio opens in a focused **Demo Flow** view (the manual tooling — mode selection and scene composing — lives in a separate **Werkstatt** view, toggled in the header). The **idea generator** now lives in the dedicated **Story GIF Composer** route. At the top sits the **Agents League · One-Click Demo** panel. A single click runs the full production pipeline end to end — from concept to a broadcast-ready GIF slideshow — and makes the Foundry IQ integration visible while it happens:
 
 1. **Story concept + 4 beats** — Foundry models generate a complete stillframe story (title, concept, style presets, four scene prompts) in the active mode. If no input is provided, a curated demo seed is used so the demo always starts reliably.
 2. **Foundry IQ grounding per scene** — Every scene render is enriched through agentic knowledge retrieval against the ARV style pack (Azure AI Search knowledge base, with curated local knowledge as fallback), keeping each visual on-brand for the channel.
@@ -86,9 +86,15 @@ While the run executes, a live pipeline strip shows each stage (Story-Konzept �
 
 This makes the required Microsoft IQ layer demonstrable in seconds: the judge sees the knowledge retrieval, the citations, and their effect on the final prompts. Full detail remains available per scene in the Prompt-Debug panel of each scene card, and the whole four-scene set can be downloaded as a ZIP for review or editing.
 
-## Manual Demo and Stillframe Story Memory
+## Stillframe Story Memory Across UI Surfaces
 
-The **Manual Demo** is the creator-facing path for producing a reusable visual sequence from a minimal input:
+Story Memory and Foundry-IQ sync are now available across multiple surfaces:
+
+- **Manual Demo** for guided prompt + style-upload story generation.
+- **Werkstatt** for deep production workflows.
+- **Story GIF Composer** for storyboard-centric prompt and scene authoring.
+
+The creator-facing path for producing a reusable visual sequence from minimal input stays the same:
 
 1. Type a short prompt, for example a visual motif for the next techno transmission.
 2. Upload a PNG or GIF reference image.
@@ -103,7 +109,7 @@ Saving Story Memory writes two forms of persistence:
 
 Each Story Memory contains the source prompt, story concept, extracted reference style, style presets, scene prompts, motion notes, generated video IDs when available, and continuation instructions. In the UI, saved memories can be loaded back into the editor or continued. A continuation does not reboot the story world; it carries forward the same style DNA, motifs, chronology, palette, and motion grammar into four new scenes, then saves the continuation as a new memory card.
 
-The **Mit Foundry IQ syncen** button in the Manual Demo calls `POST /api/stillframe/story-memory/sync`, which runs [scripts/sync-stillframe-story-memory.ps1](./scripts/sync-stillframe-story-memory.ps1) on the server. That script uploads `memories/stillframe-stories/*.md` into the existing Foundry IQ knowledge container (`knowledge/kb`). The button is disabled until at least one Story Memory exists, so an empty workspace does not produce noisy sync errors.
+The **Mit Foundry IQ syncen** action in Manual Demo, Werkstatt, and Story GIF Composer calls `POST /api/stillframe/story-memory/sync`, which runs [scripts/sync-stillframe-story-memory.ps1](./scripts/sync-stillframe-story-memory.ps1) on the server. That script uploads `memories/stillframe-stories/*.md` into the existing Foundry IQ knowledge container (`knowledge/kb`). The sync action is disabled until at least one Story Memory exists, so an empty workspace does not produce noisy sync errors.
 
 ### Suggested 5-minute demo script
 
@@ -112,9 +118,18 @@ The **Mit Foundry IQ syncen** button in the Manual Demo calls `POST /api/stillfr
 3. Open the **Foundry IQ Grounding** panel and show provider, citation count, and source excerpts.
 4. Expand one scene card's **Prompt-Debug** to show raw prompt → IQ brief → final model prompt.
 5. Show the four finished GIF loops and download the scene ZIP.
-6. Switch to **Manual Demo**, type a simple prompt, upload a style reference, generate four scenes, and save them as Story Memory.
-7. Show **Mit Foundry IQ syncen** to explain how saved `story.md` memories become long-term Foundry IQ knowledge.
+6. Switch to **Manual Demo** or **Werkstatt**, type a simple prompt, upload a style reference, generate four scenes, and save them as Story Memory.
+7. Show **Mit Foundry IQ syncen** (available in Manual Demo, Werkstatt, and Story GIF Composer) to explain how saved `story.md` memories become long-term Foundry IQ knowledge.
 8. Switch to `/thumbnail-studio` and generate the matching thumbnail, title, description, hashtags, and SEO keywords for the video.
+
+### OBS Tell-Slides (auto timeline)
+
+For a silent, synchronized demo overlay in OBS, the repository now includes:
+
+- `data/obs/demo_tell_timeline.json` – tracked cue timeline (SHOW/TELL pairs, cue timestamps, optional visual mode changes).
+- `demo/obs/ARV_demo_run_show_notes.md` – operator notes for the full 4-5 minute run, including architecture diagram slide content and placeholder metrics.
+
+When `obs_ai_visual.py` is loaded in OBS, the dock (`http://localhost:18888`) provides a **Demo Tell Slides** panel with **Play / Pause / Stop / Prev / Next / Reload** controls. The timeline drives overlay text automatically through TRACK/CENTER/SPELL styles while the live demo is running.
 
 ## GitHub Copilot Usage
 
@@ -202,7 +217,7 @@ High-level scene-rendering flow:
 
 High-level memory flow:
 
-1. Manual Demo saves a Story Memory card as JSON and as human-readable markdown.
+1. Manual Demo, Werkstatt, and Story GIF Composer can save a Story Memory card as JSON and as human-readable markdown.
 2. The local IQ fallback immediately invalidates its cache and can retrieve the new markdown memory.
 3. The **Mit Foundry IQ syncen** UI action calls the server sync endpoint.
 4. The server runs [scripts/sync-stillframe-story-memory.ps1](./scripts/sync-stillframe-story-memory.ps1).
@@ -287,7 +302,7 @@ To promote saved sessions into Foundry IQ long-term memory, run from the repo ro
 
 This uploads the markdown memory cards into the existing Foundry IQ knowledge container (`knowledge/kb`); the existing knowledge base indexes them on its next run. The script reads `.env.local`/`.env` automatically to resolve the Azure key. Pass `-RecreateKnowledgeBase` to also redefine the knowledge source/base via `infra/foundry-iq/scripts/sync-search-kb.ps1`.
 
-Stillframe Story Memory uses the same pattern, but is available directly from the Manual Demo UI via **Mit Foundry IQ syncen**. For command-line sync, run:
+Stillframe Story Memory uses the same pattern, and is available directly from Manual Demo, Werkstatt, and Story GIF Composer via **Mit Foundry IQ syncen**. For command-line sync, run:
 
 ```powershell
 ./scripts/sync-stillframe-story-memory.ps1
@@ -436,8 +451,9 @@ The Express server also hosts the Vite app and will bind to the first free port 
 ### 4a. Use the Stillframe demo surfaces
 
 - **Demo Flow** is the fastest contest path: click **Demo-Lauf starten**, watch the live pipeline log, inspect Foundry IQ citations, render four GIF scenes, then export the scene ZIP.
-- **Manual Demo** is the creator path: enter a simple prompt, upload a PNG/GIF style reference, generate four scene prompts, save them as Story Memory, continue a saved memory, and sync saved `story.md` files into Foundry IQ.
-- **Werkstatt** contains the deeper workshop controls: mode selection, idea generation, scene composing, and the GIF/video demo widgets.
+- **Manual Demo** is the guided creator path: enter a simple prompt, upload a PNG/GIF style reference, generate four scene prompts, save Story Memory, continue a saved memory, and sync `story.md` into Foundry IQ.
+- **Werkstatt** contains deeper workshop controls plus Story Memory pipelines: memory abrufen, story.md speichern, Wiederverwenden/Fortsetzen, and Foundry IQ sync.
+- **Story GIF Composer** contains the idea generator and Story Memory pipelines: memory abrufen, story.md speichern, Foundry IQ sync, and loading saved memories into the composer.
 
 ### 5. Validate production build
 
@@ -550,8 +566,8 @@ If you are preparing the contest video next, this is a practical sequence:
 2. Run **Demo-Lauf starten** in **Demo Flow** and narrate story generation, Foundry IQ grounding, Sora rendering, GIF conversion, and the live pipeline log.
 3. Open **Foundry IQ Grounding** and **Prompt-Debug** to show citations and the final grounded prompt.
 4. Show the four GIF loops and export the scene ZIP.
-5. Switch to **Manual Demo**, enter a simple prompt, upload a style reference, generate four scenes, save Story Memory, and explain continuation.
-6. Show **Mit Foundry IQ syncen** as the bridge from local `story.md` memory into the Foundry IQ knowledge base.
+5. Switch to **Manual Demo** or **Werkstatt**, enter a simple prompt, upload a style reference, generate four scenes, save Story Memory, and explain continuation.
+6. Show **Mit Foundry IQ syncen** (also available in Story GIF Composer) as the bridge from local `story.md` memory into the Foundry IQ knowledge base.
 7. Open `/thumbnail-studio` and generate the matching thumbnail plus YouTube metadata.
 8. End on the architecture diagram and the Microsoft IQ explanation.
 

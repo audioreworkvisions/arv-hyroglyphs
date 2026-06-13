@@ -240,7 +240,7 @@ export default function App() {
       return;
     }
 
-    navigate('/stillframe');
+    navigate('/story-gif-composer');
   }, [navigate]);
 
   const isLibraryRoute = browserLocation.pathname === '/library';
