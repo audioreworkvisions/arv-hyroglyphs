@@ -30,11 +30,6 @@
     "components/BabylonVisualizer.tsx",
     "components/arv-live/**",
     "lib/arv-live/**",
-    "server/routes/arvLiveRoutes.ts",
-    "server/routes/falRoutes.ts",
-    "server/routes/geminiRoutes.ts",
-    "services/geminiService.ts",
-    "lib/storyGenerator.ts",
-    "src/lib/storyGenerator.ts"
+    "server/routes/arvLiveRoutes.ts"
   ]
 }

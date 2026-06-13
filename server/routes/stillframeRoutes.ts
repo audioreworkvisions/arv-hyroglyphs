@@ -41,6 +41,7 @@ import { VIDEO_FAILURE_STATUSES, VIDEO_SUCCESS_STATUSES, sleep } from '../utils/
 import {
   listStoryMemoryCards,
   normalizeStoryMemoryCard,
+  syncStoryMemoryToFoundryIq,
   writeStoryMemoryCard,
 } from '../services/stillframeStoryMemoryService';
 
@@ -1206,6 +1207,25 @@ export const createStillframeRoutes = () => {
     }
   });
 
+  /** POST /api/stillframe/story-memory/sync */
+  router.post('/api/stillframe/story-memory/sync', async (req, res) => {
+    try {
+      const result = await syncStoryMemoryToFoundryIq({
+        includeStylePack: Boolean(req.body?.includeStylePack),
+        recreateKnowledgeBase: Boolean(req.body?.recreateKnowledgeBase),
+      });
+      return res.json({ success: true, ...result });
+    } catch (error) {
+      const message = toErrorMessage(error, 'Story memory sync failed');
+      if (/No stillframe story-memory markdown files/i.test(message)) {
+        return res.status(400).json({ error: 'Noch keine story.md vorhanden. Speichere zuerst eine Story-Memory.' });
+      }
+
+      console.error('Stillframe story-memory sync Fehler:', error);
+      return res.status(500).json({ error: message });
+    }
+  });
+
   /**
    * POST /api/stillframe/ideas
   * Body: { seed?: string, mode?: 'ritual'|'satire'|'signal', keywords?: string[], referenceStyle?: {...} }
@@ -1981,6 +2001,64 @@ Rules:
   });
 
   /**
+   * POST /api/stillframe/video/preview
+   * Body: { prompt: string, beatIndex?: number, remixVideoId?: string, videoTransform?: 'remix' | 'extend' }
+   * Returns the exact IQ-grounded prompt debug payload before a Sora request is started.
+   */
+  router.post('/api/stillframe/video/preview', async (req, res) => {
+    try {
+      const userPrompt = asNonEmptyString(req.body?.prompt);
+      if (!userPrompt) {
+        return res.status(400).json({ error: 'prompt ist erforderlich.' });
+      }
+
+      const stylePresets = resolveStillframeRequestStylePresets(req.body?.stylePresetIds);
+      const referenceStyle = normalizeReferenceStyleSummary(req.body?.referenceStyle);
+      const remixVideoId = asNonEmptyString(req.body?.remixVideoId);
+      const videoTransform = remixVideoId
+        ? (req.body?.videoTransform === 'extend' ? 'extend' : 'remix')
+        : null;
+
+      const beatIndex: number | undefined =
+        Number.isInteger(Number(req.body?.beatIndex)) && req.body?.beatIndex != null
+          ? Math.max(0, Math.min(3, Number(req.body.beatIndex)))
+          : undefined;
+
+      const { promptCore, finalPrompt, iqBrief } = await buildStillframeRenderPrompt(
+        userPrompt,
+        stylePresets,
+        referenceStyle,
+        {
+          beatIndex,
+          renderTarget: 'video',
+          purpose: videoTransform ?? 'create',
+          remixVideoId,
+          iqContext: req.body?.iqContext,
+        },
+      );
+
+      return res.json({
+        success: true,
+        beatIndex,
+        debug: {
+          target: 'video',
+          rawPrompt: userPrompt,
+          cleanedPrompt: promptCore,
+          finalPrompt,
+          renderMode: videoTransform ?? 'create',
+          sourceVideoId: remixVideoId ?? null,
+          iqBrief: normalizeIQBriefForDebug(iqBrief),
+          stylePresetIds: stylePresets.map((preset) => preset.id),
+          referenceStyleSummary: referenceStyle?.summary ?? null,
+        } satisfies StillframeRenderPromptDebug,
+      });
+    } catch (error) {
+      console.error('Stillframe video preview Fehler:', error);
+      return res.status(500).json({ error: toErrorMessage(error, 'Stillframe video prompt preview failed') });
+    }
+  });
+
+  /**
    * POST /api/stillframe/video
     * Body: { prompt: string, seconds?: number, beatIndex?: number, remixVideoId?: string, videoTransform?: 'remix' | 'extend' }
    * Returns: { videoBase64, videoUrl?, videoId, jobId, status, seconds, beatIndex }
@@ -2009,29 +2087,55 @@ Rules:
       const deployment =
         (process.env.AZURE_OPENAI_VIDEO_DEPLOYMENT || process.env.AZURE_VIDEO_MODEL || 'sora-2').trim();
 
-      const { promptCore, finalPrompt, iqBrief } = await buildStillframeRenderPrompt(
-        userPrompt,
-        stylePresets,
-        referenceStyle,
-        {
-          beatIndex,
-          renderTarget: 'video',
-          purpose: videoTransform ?? 'create',
-          remixVideoId,
-          iqContext: req.body?.iqContext,
-        },
-      );
-      const debug = {
-        target: 'video',
-        rawPrompt: userPrompt,
-        cleanedPrompt: promptCore,
-        finalPrompt,
-        renderMode: videoTransform ?? 'create',
-        sourceVideoId: remixVideoId ?? null,
-        iqBrief: normalizeIQBriefForDebug(iqBrief),
-        stylePresetIds: stylePresets.map((preset) => preset.id),
-        referenceStyleSummary: referenceStyle?.summary ?? null,
-      } satisfies StillframeRenderPromptDebug;
+      const preparedPromptDebug = req.body?.preparedPromptDebug && typeof req.body.preparedPromptDebug === 'object'
+        ? req.body.preparedPromptDebug as Partial<StillframeRenderPromptDebug>
+        : null;
+      const canReusePreparedPrompt = preparedPromptDebug?.target === 'video'
+        && preparedPromptDebug.rawPrompt === userPrompt
+        && Boolean(asNonEmptyString(preparedPromptDebug.finalPrompt));
+
+      let resolvedDebug: StillframeRenderPromptDebug | null = null;
+      if (canReusePreparedPrompt) {
+        resolvedDebug = {
+          target: 'video',
+          rawPrompt: userPrompt,
+          cleanedPrompt: asNonEmptyString(preparedPromptDebug?.cleanedPrompt) || userPrompt,
+          finalPrompt: asNonEmptyString(preparedPromptDebug?.finalPrompt)!,
+          renderMode: videoTransform ?? 'create',
+          sourceVideoId: remixVideoId ?? null,
+          iqBrief: normalizeIQBriefForDebug(preparedPromptDebug?.iqBrief ?? null),
+          stylePresetIds: stylePresets.map((preset) => preset.id),
+          referenceStyleSummary: referenceStyle?.summary ?? null,
+        } satisfies StillframeRenderPromptDebug;
+      }
+
+      let finalPrompt = resolvedDebug?.finalPrompt;
+      if (!finalPrompt || !resolvedDebug) {
+        const builtPrompt = await buildStillframeRenderPrompt(
+          userPrompt,
+          stylePresets,
+          referenceStyle,
+          {
+            beatIndex,
+            renderTarget: 'video',
+            purpose: videoTransform ?? 'create',
+            remixVideoId,
+            iqContext: req.body?.iqContext,
+          },
+        );
+        finalPrompt = builtPrompt.finalPrompt;
+        resolvedDebug = {
+          target: 'video',
+          rawPrompt: userPrompt,
+          cleanedPrompt: builtPrompt.promptCore,
+          finalPrompt,
+          renderMode: videoTransform ?? 'create',
+          sourceVideoId: remixVideoId ?? null,
+          iqBrief: normalizeIQBriefForDebug(builtPrompt.iqBrief),
+          stylePresetIds: stylePresets.map((preset) => preset.id),
+          referenceStyleSummary: referenceStyle?.summary ?? null,
+        } satisfies StillframeRenderPromptDebug;
+      }
 
       let job = videoTransform === 'extend'
         ? await foundryVideoExtend({
@@ -2080,7 +2184,7 @@ Rules:
               seconds: requestedSeconds,
               beatIndex,
               debug: {
-                ...debug,
+                ...resolvedDebug,
                 resultVideoId: resolvedVideoId,
               },
             });
@@ -2097,7 +2201,7 @@ Rules:
               seconds: requestedSeconds,
               beatIndex,
               debug: {
-                ...debug,
+                ...resolvedDebug,
                 resultVideoId: resolvedVideoId,
               },
             });

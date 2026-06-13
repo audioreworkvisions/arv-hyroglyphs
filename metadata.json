@@ -1,5 +1,5 @@
 {
   "name": "Hyroglyphs",
-  "description": "Generate GIFs from simple text with Veo 3.1. Features a Preset System, Continuity Tracking, and an Auto-Story Generator.",
+  "description": "Story-first creative AI studio for @audioreworkvisions. Hyroglyphs turns short concepts and reference images into Foundry-IQ-grounded four-scene visual sequences, renders loopable GIF/video material for techno music videos and livestreams, stores reusable Stillframe Story Memory, and generates matching thumbnails plus YouTube metadata.",
   "requestFramePermissions": []
 }

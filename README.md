@@ -2,7 +2,7 @@
 
 ![Hyroglyphs banner](repo-banner.png)
 
-**Story-first creative AI studio that produces the visual layer for the techno music channel [@audioreworkvisions](https://www.youtube.com/@audioreworkvisions): loopable AI-generated GIF scenes that run as a GIF slideshow — the image/video source for music videos and techno livestreams — plus matching thumbnails and YouTube metadata.**
+**Story-first creative AI studio for the techno music channel [@audioreworkvisions](https://www.youtube.com/@audioreworkvisions). Hyroglyphs turns short concepts and reference images into grounded four-scene visual sequences, renders them as loopable GIF/video material for music videos and techno livestreams, stores reusable story/style memory, and finishes the publishing package with thumbnails and YouTube metadata.**
 
 Prepared as a submission candidate for the Microsoft Agents League Contest @ AI Skills Fest 2026 under the Creative Apps track.
 
@@ -24,7 +24,7 @@ Relevant source material:
 | Public source repository | Ready | This repository |
 | Project description | Ready | This README |
 | Architecture diagram | Ready | Included below |
-| Microsoft IQ integration | Ready | Foundry IQ grounding is integrated and documented |
+| Microsoft IQ integration | Ready | Foundry IQ grounding, local fallback, story memory, and knowledge sync are integrated and documented |
 | Demo video (5 minutes max) | Pending | Add your final YouTube or Vimeo link before submission |
 | Team metadata | Pending if needed | Add team members and Microsoft Learn usernames in the contest submission form if applicable |
 
@@ -32,18 +32,20 @@ Demo video link: Add your final public YouTube or Vimeo URL here before submitti
 
 ## What Hyroglyphs Is
 
-Hyroglyphs is the production tool behind the YouTube channel **@audioreworkvisions**. Every techno release and livestream on the channel needs a visual layer — and instead of filming or hand-animating it, Hyroglyphs generates it: four-beat stories rendered as loopable GIF scenes that play as a **GIF slideshow**, simulating and representing the finished music video. The finished GIFs are used directly as the image/video source in music videos and techno livestreams.
+Hyroglyphs is the production tool behind the YouTube channel **@audioreworkvisions**. Every techno release and livestream on the channel needs a visual layer. Instead of filming or hand-animating that layer, Hyroglyphs generates it as a sequence of four loopable scenes. The rendered GIFs can run as a **GIF slideshow** in OBS, editing software, or livestream tooling, simulating and representing the finished music video while remaining lightweight enough for rapid iteration.
 
 The workflow is story-first instead of one-off prompting:
 
-1. Generate or refine story concepts (or run the one-click demo pipeline).
-2. Break them into structured scenes.
-3. Ground the creative intent with Foundry IQ or curated local knowledge, so every visual stays on-brand for the channel.
-4. Turn scenes into stillframes, sketches, GIF loops, or video clips.
-5. Keep iterating through remix and extension flows instead of restarting from scratch.
-6. Finish the release in the **ARV Thumbnail Studio**: thumbnail, title, description, hashtags, and SEO keywords for the video — generated with Foundry models and grounded by Foundry IQ.
+1. Start with a short concept, an uploaded style reference, or the one-click demo seed.
+2. Generate a four-scene visual story with continuity, motion grammar, and style presets.
+3. Ground each scene with Foundry IQ or curated local knowledge, so the output stays on-brand for the channel.
+4. Render scenes as stillframes, sketches, GIF loops, or Azure/Sora video clips.
+5. Save the prompt, extracted style DNA, scene prompts, and continuation notes as **Stillframe Story Memory**.
+6. Reload or continue saved story memories so later scenes extend the same visual world instead of restarting from scratch.
+7. Export scene ZIPs and finished GIFs for use in music-video assembly, livestream visuals, and thumbnail production.
+8. Finish the release in the **ARV Thumbnail Studio**: thumbnail, title, description, hashtags, and SEO keywords for the video, generated with Foundry models and grounded by Foundry IQ.
 
-The project is centered on the ARV aesthetic language: dark analog archive textures, sparse compositions, controlled motion, and loop-ready visual payoffs.
+The project is centered on the ARV aesthetic language: dark analog archive textures, sparse compositions, controlled motion, high-contrast signal artifacts, and loop-ready visual payoffs.
 
 ## Why This Fits the Creative Apps Track
 
@@ -52,15 +54,27 @@ Hyroglyphs is positioned for the Creative Apps track because it is a creator-fac
 - It powers an actual publishing pipeline: the GIF slideshows it produces are the visual source for music videos and techno livestreams on @audioreworkvisions.
 - It supports ideation, art direction, prompt shaping, rendering, and iteration in one interface.
 - It turns multi-step AI orchestration into something visual and demoable in minutes.
-- It uses Microsoft IQ as a real creative intelligence layer — a brand memory that keeps every generated visual consistent with the channel's ARV aesthetic.
+- It uses Microsoft IQ as a real creative intelligence layer: style-pack retrieval, cited prompt grounding, story-memory retrieval, and knowledge sync into a reusable Azure AI Search-backed memory.
 - It exposes remix and extension workflows that feel native to artists, motion designers, and creative technologists.
 - It closes the loop from visuals to publishing: the Thumbnail Studio generates the matching thumbnail, title, description, hashtags, and SEO keywords for each video.
+
+## Stillframe Studio Demo Modes
+
+The Stillframe Studio is split into three views so the public demo stays focused while the full workshop remains available:
+
+| View | Purpose |
+| --- | --- |
+| **Demo Flow** | The curated one-click hackathon path: concept, Foundry IQ grounding, four sequential Sora renders, GIF conversion, pipeline log, scene ZIP export |
+| **Manual Demo** | A guided creator path: simple prompt, PNG/GIF style upload, reference-style extraction, automatic four-scene prompt generation, Story Memory save/load/continue/sync, scene ZIP export |
+| **Werkstatt** | The full workshop: mode selection, idea generator, scene composing, GIF/video demo widgets, deeper prompt and render controls |
+
+The split is deliberate: judges can understand the production pipeline quickly, while creators can still move into the workshop for deeper control.
 
 ## One-Click Hackathon Demo Run
 
 The Stillframe Studio opens in a focused **Demo Flow** view (the manual tooling — mode selection, idea generator, scene composing — lives in a separate **Werkstatt** view, toggled in the header). At the top sits the **Agents League · One-Click Demo** panel. A single click runs the full production pipeline end to end — from concept to a broadcast-ready GIF slideshow — and makes the Foundry IQ integration visible while it happens:
 
-1. **Story concept + 4 beats** — Foundry models generate a complete stillframe story (title, concept, style presets, four scene prompts) in the active mode (Ritual, Satire, or Signal Geometry). If no input is provided, a curated demo seed is used so the demo always starts reliably.
+1. **Story concept + 4 beats** — Foundry models generate a complete stillframe story (title, concept, style presets, four scene prompts) in the active mode. If no input is provided, a curated demo seed is used so the demo always starts reliably.
 2. **Foundry IQ grounding per scene** — Every scene render is enriched through agentic knowledge retrieval against the ARV style pack (Azure AI Search knowledge base, with curated local knowledge as fallback), keeping each visual on-brand for the channel.
 3. **4 finished video/GIF scenes** — All four scenes are rendered sequentially via Sora and automatically converted into loopable GIFs. Together they form the GIF slideshow that runs as the image/video source in the next music video or techno livestream.
 
@@ -70,17 +84,37 @@ While the run executes, a live pipeline strip shows each stage (Story-Konzept �
 - how many scenes were grounded and how many sources were cited,
 - the actual citations (source + excerpt) that shaped each render.
 
-This makes the required Microsoft IQ layer demonstrable in seconds: the judge sees the knowledge retrieval, the citations, and their effect on the final prompts (full detail per scene in the Prompt-Debug panel of each scene card).
+This makes the required Microsoft IQ layer demonstrable in seconds: the judge sees the knowledge retrieval, the citations, and their effect on the final prompts. Full detail remains available per scene in the Prompt-Debug panel of each scene card, and the whole four-scene set can be downloaded as a ZIP for review or editing.
+
+## Manual Demo and Stillframe Story Memory
+
+The **Manual Demo** is the creator-facing path for producing a reusable visual sequence from a minimal input:
+
+1. Type a short prompt, for example a visual motif for the next techno transmission.
+2. Upload a PNG or GIF reference image.
+3. Hyroglyphs extracts reference style DNA: subject focus, palette, material feel, motion language, prompt DNA, and keywords.
+4. Foundry-backed text generation creates four scene prompts that preserve that extracted style.
+5. The scenes can be rendered as GIF/video material, exported as a ZIP, or saved as Story Memory.
+
+Saving Story Memory writes two forms of persistence:
+
+- `data/stillframe/story-memory-cards/*.json` stores the structured card used by the UI.
+- `memories/stillframe-stories/*_story.md` stores a human-readable `story.md` memory for Foundry IQ and local retrieval.
+
+Each Story Memory contains the source prompt, story concept, extracted reference style, style presets, scene prompts, motion notes, generated video IDs when available, and continuation instructions. In the UI, saved memories can be loaded back into the editor or continued. A continuation does not reboot the story world; it carries forward the same style DNA, motifs, chronology, palette, and motion grammar into four new scenes, then saves the continuation as a new memory card.
+
+The **Mit Foundry IQ syncen** button in the Manual Demo calls `POST /api/stillframe/story-memory/sync`, which runs [scripts/sync-stillframe-story-memory.ps1](./scripts/sync-stillframe-story-memory.ps1) on the server. That script uploads `memories/stillframe-stories/*.md` into the existing Foundry IQ knowledge container (`knowledge/kb`). The button is disabled until at least one Story Memory exists, so an empty workspace does not produce noisy sync errors.
 
 ### Suggested 5-minute demo script
 
-1. Open the Stillframe Studio (default route `/`) — it starts in the focused **Demo Flow** view and explains the use case: producing the visual layer for @audioreworkvisions.
-2. Optionally type a concept — or leave everything empty to use the curated demo seed.
-3. Click **Demo-Lauf starten** and narrate the pipeline strip and the **Live Pipeline Log** while they progress.
-4. When the first scene completes, open the **Foundry IQ Grounding** panel and show provider + citations.
-5. Expand one scene card's **Prompt-Debug** to show raw prompt → IQ brief → final model prompt.
-6. Show the four finished GIF loops — the slideshow that will run in the next music video or livestream — and download one.
-7. Switch to `/thumbnail-studio` and generate the matching thumbnail, title, description, hashtags, and SEO keywords for the video.
+1. Open the Stillframe Studio (default route `/`) and show the **Demo Flow** view: Hyroglyphs creates the visual layer for @audioreworkvisions.
+2. Click **Demo-Lauf starten** and narrate the pipeline strip and **Live Pipeline Log** as story generation, IQ grounding, Sora render, and GIF conversion progress.
+3. Open the **Foundry IQ Grounding** panel and show provider, citation count, and source excerpts.
+4. Expand one scene card's **Prompt-Debug** to show raw prompt → IQ brief → final model prompt.
+5. Show the four finished GIF loops and download the scene ZIP.
+6. Switch to **Manual Demo**, type a simple prompt, upload a style reference, generate four scenes, and save them as Story Memory.
+7. Show **Mit Foundry IQ syncen** to explain how saved `story.md` memories become long-term Foundry IQ knowledge.
+8. Switch to `/thumbnail-studio` and generate the matching thumbnail, title, description, hashtags, and SEO keywords for the video.
 
 ## GitHub Copilot Usage
 
@@ -102,35 +136,36 @@ The main studio surface focuses on creative sequencing rather than one-off promp
 
 Stillframe Rituals is a focused creation surface for four-beat visual loops — the GIF scenes that make up a slideshow. It supports:
 
-- one-click demo run (full story + 4 GIF scenes, see above)
-- idea generation
-- prompt polishing
+- one-click demo run (full story + 4 GIF scenes, live log, IQ grounding, scene ZIP)
+- manual demo run (simple prompt + PNG/GIF reference style extraction → 4 scene prompts)
+- idea generation and prompt polishing
 - batch polish / sketch / render across all four beats
-- sketch generation
-- video-to-GIF conversion
-- video remix
-- video extension
+- sketch generation, video rendering, and video-to-GIF conversion
+- video remix and video extension using previous source video IDs
 - reference DNA from uploaded images
+- Story Memory save, reload, continuation, and Foundry IQ sync
 
 ### 3. Story scene rendering
 
-Story scenes can be rendered with grounded prompts, stored with their resulting assets, and revisited later. The app tracks source video IDs for derivative flows so creators can iterate instead of re-rolling from zero.
+Story scenes can be rendered with grounded prompts, stored with their resulting assets, and revisited later. The app tracks source video IDs for derivative flows so creators can iterate instead of re-rolling from zero. Four-scene sets can be exported as ZIP files containing prompts, debug metadata, GIFs, and rendered assets for editing or review.
 
 ### 4. Foundry IQ grounding
 
-Hyroglyphs integrates Foundry IQ as the required Microsoft IQ layer. Scene requests can be enriched with context such as:
+Hyroglyphs integrates Foundry IQ as the required Microsoft IQ layer. Scene requests and memory lookups can be enriched with context such as:
 
 - story title and concept
 - scene chronology
 - style preset IDs
 - reference palette and motion DNA
 - source video ID for remix or extension
+- saved Story Memory markdown from `memories/stillframe-stories/`
+- saved Thumbnail Studio memory from `memories/thumbnail-studio/`
 
-That context is turned into a grounded prompt brief before rendering, helping maintain style consistency, continuity, and safer iteration.
+That context is turned into a grounded prompt brief before rendering, helping maintain style consistency, continuity, and safer iteration. When the remote Foundry IQ agent is unavailable, the same query is answered by the curated local knowledge fallback, including dynamic markdown memory folders.
 
 ### 5. Library and export surface
 
-Generated ideas, GIFs, and story outputs can be stored in the in-browser library for replay, export, and follow-up iterations — the staging area for assembling slideshow material for upcoming releases and streams.
+Generated ideas, GIFs, scene ZIPs, Story Memory cards, and story outputs can be stored or exported for replay and follow-up iterations — the staging area for assembling slideshow material for upcoming releases and streams.
 
 ### 6. Azure usage visibility
 
@@ -146,24 +181,33 @@ Hyroglyphs intentionally combines creative generation with Microsoft platform de
 | Microsoft Foundry IQ | Required Microsoft IQ layer for grounded, cited prompt context |
 | Azure AI Foundry Inference | Text and image orchestration in Foundry-backed flows |
 | Azure OpenAI / Azure video endpoints | Video generation, remix, and extension in Azure-backed flows |
-| Azure AI Search + Storage | Knowledge base backbone for Foundry IQ export and retrieval |
+| Azure AI Search + Storage | Knowledge base backbone for Foundry IQ export, retrieval, and long-term memory sync |
 | OpenAI APIs | Parallel text, image, and video provider path for flexible local demos |
 | FFmpeg | Final video-to-GIF conversion for shareable visual loops |
 | Azure App Service | Included deployment target for public hosting |
 
-Optional provider hooks for Gemini and Fal AI are still present in the repository, but the primary contest narrative for this project is the Foundry/OpenAI creative workflow grounded by Foundry IQ.
+The repository is scoped to the Foundry/OpenAI creative workflow for the hackathon demo. Older experimental Gemini and Fal provider hooks were removed to keep the public submission focused.
 
 ## How Foundry IQ Is Used
 
 Foundry IQ is not just mentioned for compliance. It is wired into the prompt-building path.
 
-High-level flow:
+High-level scene-rendering flow:
 
 1. The UI sends a structured scene context.
-2. The server normalizes that context into an IQ query.
+2. The server normalizes that context into an IQ query that includes scene chronology, style presets, reference DNA, and source video continuity.
 3. A remote Foundry IQ agent is used when configured.
-4. If the remote agent is unavailable, Hyroglyphs falls back to curated local knowledge from repo documents.
+4. If the remote agent is unavailable, Hyroglyphs falls back to curated local knowledge from repo documents and markdown memory folders.
 5. The resulting brief is injected into the final model prompt before rendering.
+
+High-level memory flow:
+
+1. Manual Demo saves a Story Memory card as JSON and as human-readable markdown.
+2. The local IQ fallback immediately invalidates its cache and can retrieve the new markdown memory.
+3. The **Mit Foundry IQ syncen** UI action calls the server sync endpoint.
+4. The server runs [scripts/sync-stillframe-story-memory.ps1](./scripts/sync-stillframe-story-memory.ps1).
+5. The script uploads saved `story.md` files into the same Azure Storage / Azure AI Search knowledge container used by Foundry IQ.
+6. Future remote IQ lookups can retrieve those story memories alongside the ARV style pack.
 
 ### Authentication for the remote IQ agent
 
@@ -233,7 +277,7 @@ It also reuses the existing Azure / Foundry IQ variables (`AZURE_AI_FOUNDRY_*`, 
 - `data/thumbnail-studio/exports/` — rendered thumbnail PNGs
 - `memories/thumbnail-studio/` — human-readable memory cards (markdown)
 
-### Syncing memory into Foundry IQ
+### Syncing thumbnail memory into Foundry IQ
 
 To promote saved sessions into Foundry IQ long-term memory, run from the repo root:
 
@@ -242,6 +286,14 @@ To promote saved sessions into Foundry IQ long-term memory, run from the repo ro
 ```
 
 This uploads the markdown memory cards into the existing Foundry IQ knowledge container (`knowledge/kb`); the existing knowledge base indexes them on its next run. The script reads `.env.local`/`.env` automatically to resolve the Azure key. Pass `-RecreateKnowledgeBase` to also redefine the knowledge source/base via `infra/foundry-iq/scripts/sync-search-kb.ps1`.
+
+Stillframe Story Memory uses the same pattern, but is available directly from the Manual Demo UI via **Mit Foundry IQ syncen**. For command-line sync, run:
+
+```powershell
+./scripts/sync-stillframe-story-memory.ps1
+```
+
+This uploads `memories/stillframe-stories/*.md` into the same `knowledge/kb` container so Foundry IQ can retrieve prior visual stories and continue them later.
 
 ### Demo flow
 
@@ -261,16 +313,22 @@ flowchart LR
     U[Creator] --> UI[React + Vite studio]
     UI --> STORY[Story-first surface]
     UI --> STILL[Stillframe Rituals]
+    UI --> MANUAL[Manual Demo + Story Memory]
     UI --> LIB[Library and exports]
     UI --> USAGE[Azure usage panel]
 
     STORY --> API[Express orchestration layer]
     STILL --> API
+    MANUAL --> API
 
     API --> IQCTX[Scene + style + chronology context]
     IQCTX --> IQ[Foundry IQ agent]
     IQ --> SEARCH[Azure AI Search knowledge base]
     SEARCH --> STORAGE[Blob-backed repo knowledge]
+    API --> LOCALMEM[Local markdown memory]
+    LOCALMEM --> IQCTX
+    API --> SYNCSCRIPT[Story/thumbnail sync scripts]
+    SYNCSCRIPT --> STORAGE
 
     API --> FOUNDRY[Azure AI Foundry / Azure OpenAI]
     API --> OPENAI[OpenAI APIs]
@@ -278,7 +336,10 @@ flowchart LR
 
     FOUNDRY --> RENDERS[Storyboards, images, videos]
     OPENAI --> RENDERS
-    FFMPEG --> LIB
+    FFMPEG --> GIFS[Loopable GIF slideshow scenes]
+    RENDERS --> EXPORTS[Scene ZIPs and saved assets]
+    GIFS --> LIB
+    EXPORTS --> LIB
 
     APPSVC[Azure App Service deploy path] --> API
 ```
@@ -290,10 +351,10 @@ The official contest judging rubric weights accuracy, reasoning, creativity, UX,
 | Judging area | How Hyroglyphs addresses it |
 | --- | --- |
 | Accuracy and relevance (20%) | A working creative app with a clear creator workflow, documented setup, and submission-oriented README |
-| Reasoning and multi-step thinking (20%) | Story-to-scene orchestration, chronology-aware context, IQ grounding, and derivative video transforms |
+| Reasoning and multi-step thinking (20%) | Story-to-scene orchestration, chronology-aware context, IQ grounding, Story Memory continuation, and derivative video transforms |
 | Creativity and originality (15%) | Distinct ARV visual language, ritual loop structure, and story-first creative UX |
-| User experience and presentation (15%) | Separate creation surfaces, library, debug visibility, and demo-friendly flows |
-| Reliability and safety (20%) | Public-safe repo guidance, environment-variable secrets, local IQ fallback, and validated build |
+| User experience and presentation (15%) | Separate Demo Flow, Manual Demo, Werkstatt, library, debug visibility, and demo-friendly flows |
+| Reliability and safety (20%) | Public-safe repo guidance, environment-variable secrets, local IQ fallback, explicit sync button, and validated build |
 | Community vote (10%) | README, architecture, and demo plan are structured for clear public presentation |
 
 ## Repository Walkthrough
@@ -302,11 +363,14 @@ Important entry points:
 
 - [App shell](./App.tsx) - top-level routing between story studio, stillframe, library, and usage views
 - [Stillframe Rituals](./components/StillframeHarness.tsx) - four-beat stillframe and loop workflow
+- [Stillframe Story Memory service](./server/services/stillframeStoryMemoryService.ts) - JSON/markdown memory persistence and Foundry IQ sync launcher
 - [Story mode](./components/StoryMode.tsx) - multi-scene story generation and rendering workflow
 - [Library](./components/Library.tsx) - saved outputs and reuse surface
 - [Server entry](./server/index.ts) - Express + Vite server bootstrap
 - [IQ orchestration](./server/utils/iq.ts) - Foundry IQ and local fallback grounding
 - [Foundry service](./services/foundryService.ts) - Azure AI Foundry and Azure video integration
+- [Story Memory sync](./scripts/sync-stillframe-story-memory.ps1) - uploads saved Stillframe story markdown into the Foundry IQ knowledge container
+- [Thumbnail Memory sync](./scripts/sync-thumbnail-memory.ps1) - uploads Thumbnail Studio markdown memory into the Foundry IQ knowledge container
 - [Foundry IQ infra export](./infra/foundry-iq/README.md) - reusable infrastructure for the knowledge layer
 - [Azure App Service deploy path](./infra/appservice/README.md) - deployment scaffolding for public hosting
 
@@ -369,6 +433,12 @@ npm run dev
 
 The Express server also hosts the Vite app and will bind to the first free port starting at `4173` unless a port is explicitly provided.
 
+### 4a. Use the Stillframe demo surfaces
+
+- **Demo Flow** is the fastest contest path: click **Demo-Lauf starten**, watch the live pipeline log, inspect Foundry IQ citations, render four GIF scenes, then export the scene ZIP.
+- **Manual Demo** is the creator path: enter a simple prompt, upload a PNG/GIF style reference, generate four scene prompts, save them as Story Memory, continue a saved memory, and sync saved `story.md` files into Foundry IQ.
+- **Werkstatt** contains the deeper workshop controls: mode selection, idea generation, scene composing, and the GIF/video demo widgets.
+
 ### 5. Validate production build
 
 ```bash
@@ -423,10 +493,11 @@ Not every variable is required at once. The repository supports multiple provide
 - `AZURE_FOUNDRY_IQ_AGENT_VERSION`
 - `AZURE_OPENAI_IQ_MODEL`
 
-### Optional provider hooks
+### Stillframe Story Memory variables
 
-- `API_KEY` or `GEMINI_API_KEY`
-- `FAL_KEY`
+- `ARV_STILLFRAME_STORY_MEMORY_DATA_DIR` - optional JSON storage root for Story Memory cards, defaults to `data/stillframe/story-memory-cards`
+
+Markdown Story Memory is written to `memories/stillframe-stories/` so both the local IQ fallback and the Foundry IQ sync script can read it.
 
 ## Deployment
 
@@ -475,13 +546,13 @@ Hyroglyphs is intended to be presented from a public-safe repository state.
 
 If you are preparing the contest video next, this is a practical sequence:
 
-1. Open the story-first studio and explain the creative problem Hyroglyphs solves.
-2. Generate or refine a story concept.
-3. Show how scene context is grounded with Foundry IQ.
-4. Render a stillframe or story scene.
-5. Jump into Stillframe Rituals and show idea generation or reference DNA.
-6. Demonstrate video remix and video extension from an existing clip.
-7. Open the library to show saved outputs.
+1. Open the Stillframe Studio and explain the production problem: @audioreworkvisions needs loopable visual material for music videos and techno livestreams.
+2. Run **Demo-Lauf starten** in **Demo Flow** and narrate story generation, Foundry IQ grounding, Sora rendering, GIF conversion, and the live pipeline log.
+3. Open **Foundry IQ Grounding** and **Prompt-Debug** to show citations and the final grounded prompt.
+4. Show the four GIF loops and export the scene ZIP.
+5. Switch to **Manual Demo**, enter a simple prompt, upload a style reference, generate four scenes, save Story Memory, and explain continuation.
+6. Show **Mit Foundry IQ syncen** as the bridge from local `story.md` memory into the Foundry IQ knowledge base.
+7. Open `/thumbnail-studio` and generate the matching thumbnail plus YouTube metadata.
 8. End on the architecture diagram and the Microsoft IQ explanation.
 
 ## Current Validation Status
@@ -496,4 +567,4 @@ This command runs TypeScript checking, the Vite frontend build, and the bundled 
 
 ## Closing Note
 
-Hyroglyphs is not presented as a generic prompt playground. It is a creative application with a distinct aesthetic system, a story-first workflow, grounded intelligence through Foundry IQ, and a demo-friendly product surface prepared for public contest submission.
+Hyroglyphs is not presented as a generic prompt playground. It is a creative application with a distinct aesthetic system, a story-first workflow, persistent story/style memory, grounded intelligence through Foundry IQ, and a demo-friendly product surface prepared for public contest submission.

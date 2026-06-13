@@ -4,7 +4,7 @@
 - STORY_ENGINE_MASTER_ADDITION in lib/storyboardTuning.ts is a high-leverage global suffix; change it together with EN/DE storytelling rules when story outputs feel too calm or generic.
 - Validation for story prompt changes: npm run typecheck, then npm run build.
 - Sora video duration must stay fixed to supported values 4, 8, or 12 seconds; UI defaults to 4s and server routes normalize incoming seconds to the nearest supported value.
-- Story arc selection now flows end-to-end through components/StoryMode.tsx -> /api/openai|gemini|foundry/storyboard -> lib/storyboardTuning.ts and server/utils/storyboard.ts.
+- Story arc selection now flows end-to-end through components/StoryMode.tsx -> /api/openai|foundry/storyboard -> lib/storyboardTuning.ts and server/utils/storyboard.ts.
 - Story scenes now use fixed structural beats in order: emergence, lock-in, peak, afterimage.
 - UI exposes two arc modes: iconic (series-ident pressure, dominant hero moments) and cinematic (more connective sequence flow).
 - Stillframe prompt control now centers on components/StillframeHarness.tsx plus server/routes/stillframeRoutes.ts; batch polish reuses /api/stillframe/polish sequentially across all four scenes.

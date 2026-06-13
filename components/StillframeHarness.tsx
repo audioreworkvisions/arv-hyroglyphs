@@ -639,6 +639,7 @@ export default function StillframeHarness({
   const [selectedStoryMemoryId, setSelectedStoryMemoryId] = useState('');
   const [isLoadingStoryMemories, setIsLoadingStoryMemories] = useState(false);
   const [isSavingStoryMemory, setIsSavingStoryMemory] = useState(false);
+  const [isSyncingStoryMemory, setIsSyncingStoryMemory] = useState(false);
   const [storyMemoryMessage, setStoryMemoryMessage] = useState<string | null>(null);
   const [isPreparingReferences, setIsPreparingReferences] = useState(false);
   const [conceptError, setConceptError] = useState<string | null>(null);
@@ -656,6 +657,7 @@ export default function StillframeHarness({
   const [microMotion, setMicroMotion] = useState<string | null>(null);
   const [scenes, setScenes] = useState<SceneState[]>([]);
   const scenesRef = useRef<SceneState[]>([]);
+  const hasRequestedInitialStoryMemoryLoadRef = useRef(false);
   const ideaSectionRef = useRef<HTMLElement | null>(null);
   const stillframeSectionRef = useRef<HTMLDivElement | null>(null);
   const storyComposerSectionRef = useRef<HTMLElement | null>(null);
@@ -1379,28 +1381,56 @@ export default function StillframeHarness({
     const effectiveStylePresets = options.context ? options.context.stylePresets : stylePresets;
     const effectiveReferenceStyle = options.context ? options.context.referenceStyle : referenceStyle;
     const renderSeconds = normalizeVideoDurationSeconds(scenesRef.current[index]?.durationSeconds);
-    pushPipelineLog('info', `Szene ${index + 1} · Sora-Render gestartet (${renderSeconds}s${videoTransform ? ` · ${videoTransform === 'extend' ? 'Extension' : 'Remix'}` : ''})`);
+    const videoRequestBody = {
+      prompt: scenePrompt,
+      seconds: renderSeconds,
+      beatIndex: index,
+      stylePresetIds: effectiveStylePresets.map((preset) => preset.id),
+      referenceStyle: effectiveReferenceStyle,
+      iqContext: buildStillframeIQContext(
+        scenesRef.current,
+        index,
+        effectiveStoryTitle,
+        effectiveStoryConcept,
+        effectiveReferenceStyle,
+        effectiveStylePresets,
+        remixVideoId ?? null,
+        videoTransform,
+      ),
+      ...(remixVideoId ? { remixVideoId, videoTransform } : {}),
+    };
+
+    pushPipelineLog('info', `Szene ${index + 1} · Foundry-IQ Prompt-Preview wird vorbereitet…`);
+    const previewRes = await fetch('/api/stillframe/video/preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(videoRequestBody),
+    });
+    const previewData = await previewRes.json();
+    if (!previewRes.ok) {
+      pushPipelineLog('error', `Szene ${index + 1} · Prompt-Preview fehlgeschlagen: ${previewData.error || 'Video prompt preview failed.'}`);
+      throw new Error(previewData.error || 'Video prompt preview failed.');
+    }
+
+    const previewDebug = (previewData.debug ?? null) as StillframeRenderPromptDebug | null;
+    updateScene(index, { renderPromptDebug: previewDebug });
+    if (previewDebug?.iqBrief) {
+      pushPipelineLog('detail', `Szene ${index + 1} · Foundry-IQ Daten abgerufen: ${previewDebug.iqBrief.usedRemote ? 'Foundry IQ Agent (remote)' : 'Workspace KB (Fallback)'} · ${previewDebug.iqBrief.citations.length} Zitate`);
+      pushPipelineLog('detail', `Szene ${index + 1} · IQ Query: ${truncateForLog(previewDebug.iqBrief.query)}`);
+    }
+    if (previewDebug?.finalPrompt) {
+      pushPipelineLog('detail', `Szene ${index + 1} · Sora-2 Prompt bereit: ${truncateForLog(previewDebug.finalPrompt)}`);
+    }
+
+    const videoRenderRequestBody = previewDebug
+      ? { ...videoRequestBody, preparedPromptDebug: previewDebug }
+      : videoRequestBody;
+
+    pushPipelineLog('info', `Szene ${index + 1} · Sora-2 Request wird jetzt gesendet (${renderSeconds}s${videoTransform ? ` · ${videoTransform === 'extend' ? 'Extension' : 'Remix'}` : ''})`);
     const videoRes = await fetch('/api/stillframe/video', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        prompt: scenePrompt,
-        seconds: renderSeconds,
-        beatIndex: index,
-        stylePresetIds: effectiveStylePresets.map((preset) => preset.id),
-        referenceStyle: effectiveReferenceStyle,
-        iqContext: buildStillframeIQContext(
-          scenesRef.current,
-          index,
-          effectiveStoryTitle,
-          effectiveStoryConcept,
-          effectiveReferenceStyle,
-          effectiveStylePresets,
-          remixVideoId ?? null,
-          videoTransform,
-        ),
-        ...(remixVideoId ? { remixVideoId, videoTransform } : {}),
-      }),
+      body: JSON.stringify(videoRenderRequestBody),
     });
     const videoData = await videoRes.json();
     if (!videoRes.ok) {
@@ -1744,10 +1774,10 @@ export default function StillframeHarness({
       await Promise.all(currentScenes.map(async (scene, index) => {
         const scenePrefix = `scene-${String(index + 1).padStart(2, '0')}`;
         if (scene.gifData) {
-          await addAssetToZip(zip, `${scenePrefix}/${scenePrefix}-loop.gif`, scene.gifData);
+          await addAssetToZip(zip, `${scenePrefix}-loop.gif`, scene.gifData);
         }
         if (scene.sketchData) {
-          await addAssetToZip(zip, `${scenePrefix}/${scenePrefix}-sketch.png`, scene.sketchData);
+          await addAssetToZip(zip, `${scenePrefix}-sketch.png`, scene.sketchData);
         }
       }));
 
@@ -1940,11 +1970,45 @@ export default function StillframeHarness({
     }
   }, [isGeneratingConcept, pushPipelineLog, runGenerateConcept, selectedStoryMemory]);
 
+  const handleSyncStoryMemory = useCallback(async () => {
+    if (isSyncingStoryMemory) {
+      return;
+    }
+
+    if (storyMemories.length === 0) {
+      setStoryMemoryMessage('Noch keine gespeicherte story.md vorhanden. Speichere zuerst eine Story-Memory, dann kann Foundry IQ synchronisiert werden.');
+      pushPipelineLog('detail', 'Foundry-IQ Sync übersprungen · keine gespeicherte Story-Memory vorhanden');
+      return;
+    }
+
+    setIsSyncingStoryMemory(true);
+    setStoryMemoryMessage(null);
+    pushPipelineLog('info', 'Foundry-IQ Sync gestartet · lade gespeicherte story.md Dateien in die Knowledge Base');
+    try {
+      const res = await fetch('/api/stillframe/story-memory/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ includeStylePack: false, recreateKnowledgeBase: false }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Story memory sync failed.');
+      const output = [data.stdout, data.stderr].filter(Boolean).join('\n').trim();
+      setStoryMemoryMessage(`Foundry-IQ Sync abgeschlossen: ${data.markdownCount ?? 0} Story-Memory-Datei(en) hochgeladen.${output ? `\n${output}` : ''}`);
+      pushPipelineLog('success', `Foundry-IQ Sync abgeschlossen · ${data.markdownCount ?? 0} Story-Memory-Datei(en)`);
+    } catch (err: any) {
+      setStoryMemoryMessage(err.message || 'Foundry-IQ Sync konnte nicht ausgeführt werden.');
+      pushPipelineLog('error', `Foundry-IQ Sync fehlgeschlagen: ${err.message || 'sync failed'}`);
+    } finally {
+      setIsSyncingStoryMemory(false);
+    }
+  }, [isSyncingStoryMemory, pushPipelineLog, storyMemories.length]);
+
   useEffect(() => {
-    if (studioView === 'manual-demo' && storyMemories.length === 0 && !isLoadingStoryMemories) {
+    if (studioView === 'manual-demo' && !hasRequestedInitialStoryMemoryLoadRef.current) {
+      hasRequestedInitialStoryMemoryLoadRef.current = true;
       void loadStoryMemories();
     }
-  }, [isLoadingStoryMemories, loadStoryMemories, storyMemories.length, studioView]);
+  }, [loadStoryMemories, studioView]);
 
   const handleManualDemoGenerateScenes = useCallback(async () => {
     const trimmed = concept.trim();
@@ -2458,7 +2522,7 @@ export default function StillframeHarness({
               <div className="min-w-0 space-y-1">
                 <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-[#72e4ff]">Foundry IQ Story Memory</div>
                 <p className="max-w-3xl text-xs leading-relaxed text-[#8ea6c3]">
-                  Speichert Prompt, extrahierte Style-DNA und Szenen als Markdown-Story-Memory. Gespeicherte Stories lassen sich hier wieder laden oder direkt fortsetzen; neue Fortsetzungen werden erneut als Story-Memory abgelegt.
+                  Speichert Prompt, extrahierte Style-DNA und Szenen als Markdown-Story-Memory. Gespeicherte Stories lassen sich hier wieder laden, fortsetzen und explizit mit Foundry IQ synchronisieren.
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -2482,6 +2546,16 @@ export default function StillframeHarness({
                     Als story.md speichern
                   </button>
                 )}
+                <button
+                  type="button"
+                  onClick={() => void handleSyncStoryMemory()}
+                  disabled={isSyncingStoryMemory || storyMemories.length === 0}
+                  title={storyMemories.length === 0 ? 'Speichere zuerst eine Story-Memory als story.md.' : 'Gespeicherte story.md Dateien mit Foundry IQ synchronisieren'}
+                  className="inline-flex items-center gap-2 rounded-xl border border-[rgba(232,193,106,0.24)] bg-[rgba(42,28,6,0.72)] px-3 py-2 font-mono text-[10px] font-semibold text-[#ffd980] transition hover:bg-[rgba(58,38,8,0.82)] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {isSyncingStoryMemory ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                  Mit Foundry IQ syncen
+                </button>
               </div>
             </div>
 
@@ -3745,6 +3819,8 @@ function SceneCard({ scene, index, runId, onPromptChange, onTransformPromptChang
   const beatLabel = BEAT_LABELS[scene.beat] ?? `Beat ${index + 1}`;
   const beatColorClass = BEAT_COLORS[scene.beat] ?? 'bg-zinc-800/60 text-zinc-300 border-zinc-700/50';
   const cardRingClass = BEAT_RING[scene.beat] ?? 'border-zinc-700/40';
+  const isPreparingOrRenderingVideo = scene.videoStatus === 'loading' || scene.videoStatus === 'converting';
+  const hasVideoPromptPreview = scene.renderPromptDebug?.target === 'video';
 
   return (
     <article
@@ -3926,11 +4002,20 @@ function SceneCard({ scene, index, runId, onPromptChange, onTransformPromptChang
       )}
 
       {scene.renderPromptDebug && (
-        <details className="mx-4 mb-4 rounded-[16px] border border-[rgba(114,228,255,0.1)] bg-[rgba(8,16,30,0.82)] px-4 py-3 text-xs">
+        <details
+          open={isPreparingOrRenderingVideo && hasVideoPromptPreview}
+          className="mx-4 mb-4 rounded-[16px] border border-[rgba(114,228,255,0.1)] bg-[rgba(8,16,30,0.82)] px-4 py-3 text-xs"
+        >
           <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-[0.18em] text-[#72e4ff]">
-            Prompt-Debug · {scene.renderPromptDebug.target === 'video' ? 'GIF Render' : 'Sketch Render'}
+            Prompt-Debug · {scene.renderPromptDebug.target === 'video' ? 'Sora-2 GIF Render' : 'Sketch Render'}
+            {isPreparingOrRenderingVideo && hasVideoPromptPreview ? ' · vor dem Sora-2 Request sichtbar' : ''}
           </summary>
           <div className="mt-3 space-y-3">
+            {isPreparingOrRenderingVideo && hasVideoPromptPreview && (
+              <div className="rounded-xl border border-[rgba(232,193,106,0.18)] bg-[rgba(42,28,6,0.52)] px-3 py-2 font-mono text-[10px] leading-relaxed text-[#ffd980]">
+                Dieser Prompt wurde aus Rohprompt, Style-Presets, Referenz-DNA und Foundry-IQ/Knowledge-Base-Daten gebaut und wird jetzt an Sora-2 gesendet bzw. dort verarbeitet.
+              </div>
+            )}
             <div>
               <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#36516e]">Rohprompt</div>
               <pre className="mt-2 whitespace-pre-wrap rounded-lg border border-[rgba(114,228,255,0.08)] bg-[#040d1a] px-3 py-2 font-mono text-[10px] leading-relaxed text-[#8ea6c3] overflow-x-auto">
@@ -3944,7 +4029,9 @@ function SceneCard({ scene, index, runId, onPromptChange, onTransformPromptChang
               </pre>
             </div>
             <div>
-              <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#36516e]">Finaler Modellprompt</div>
+              <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#36516e]">
+                {scene.renderPromptDebug.target === 'video' ? 'Finaler Sora-2 Prompt' : 'Finaler Modellprompt'}
+              </div>
               <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-lg border border-[rgba(168,118,255,0.12)] bg-[rgba(20,14,34,0.82)] px-3 py-2 font-mono text-[10px] leading-relaxed text-[#d8c2ff]">
                 {scene.renderPromptDebug.finalPrompt}
               </pre>
@@ -3958,9 +4045,21 @@ function SceneCard({ scene, index, runId, onPromptChange, onTransformPromptChang
             )}
             {scene.renderPromptDebug.iqBrief && (
               <div className="space-y-3 rounded-xl border border-[rgba(114,228,255,0.12)] bg-[rgba(8,18,32,0.75)] p-4">
-                <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#72e4ff]">
-                  IQ Brief · {scene.renderPromptDebug.iqBrief.usedRemote ? 'Foundry IQ' : 'Workspace KB'}
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#72e4ff]">
+                    IQ Brief · {scene.renderPromptDebug.iqBrief.usedRemote ? 'Foundry IQ' : 'Workspace KB'}
+                  </div>
+                  <span className="rounded-full border border-[rgba(114,228,255,0.14)] bg-[rgba(3,8,16,0.72)] px-2 py-0.5 font-mono text-[10px] text-[#8ea6c3]">
+                    {scene.renderPromptDebug.iqBrief.citations.length} Quelle(n)
+                  </span>
                 </div>
+                <div>
+                  <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#36516e]">IQ-Abfrage</div>
+                  <pre className="mt-2 max-h-36 overflow-auto whitespace-pre-wrap rounded-lg border border-[rgba(114,228,255,0.1)] bg-[rgba(3,8,16,0.72)] px-3 py-2 font-mono text-[10px] leading-relaxed text-[#8ea6c3]">
+                    {scene.renderPromptDebug.iqBrief.query}
+                  </pre>
+                </div>
+                <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#36516e]">Verwendeter IQ-Block im finalen Prompt</div>
                 <pre className="max-h-56 overflow-auto whitespace-pre-wrap rounded-lg border border-[rgba(114,228,255,0.12)] bg-[rgba(3,8,16,0.72)] px-3 py-2 font-mono text-[10px] leading-relaxed text-[#c8ddf0]">
                   {scene.renderPromptDebug.iqBrief.promptBlock}
                 </pre>

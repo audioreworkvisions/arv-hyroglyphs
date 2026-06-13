@@ -1,5 +1,7 @@
 import { promises as fs } from 'node:fs';
+import { execFile } from 'node:child_process';
 import path from 'node:path';
+import { promisify } from 'node:util';
 import {
   createId,
   ensureDir,
@@ -10,6 +12,8 @@ import {
   writeJsonFile,
 } from './thumbnailPaths';
 import { invalidateLocalKnowledgeCache } from '../utils/iq';
+
+const execFileAsync = promisify(execFile);
 
 export interface StillframeStoryMemoryScene {
   index: number;
@@ -110,7 +114,7 @@ const normalizeScenes = (value: unknown): StillframeStoryMemoryScene[] => {
 
   return value
     .filter((entry): entry is Record<string, unknown> => Boolean(entry) && typeof entry === 'object')
-    .map((entry, index) => ({
+    .map((entry, index): StillframeStoryMemoryScene => ({
       index: Number.isFinite(Number(entry.index)) ? Number(entry.index) : index + 1,
       beat: clean(entry.beat) || `scene-${index + 1}`,
       title: clean(entry.title) || `Szene ${index + 1}`,
@@ -250,6 +254,17 @@ export interface StoryMemoryWriteResult {
   syncHint: string;
 }
 
+export interface StoryMemorySyncOptions {
+  includeStylePack?: boolean;
+  recreateKnowledgeBase?: boolean;
+}
+
+export interface StoryMemorySyncResult {
+  markdownCount: number;
+  stdout: string;
+  stderr: string;
+}
+
 export const writeStoryMemoryCard = async (card: StillframeStoryMemoryCard): Promise<StoryMemoryWriteResult> => {
   const slug = slugify(card.title, 'story');
   const jsonDir = getStoryMemoryJsonDir();
@@ -275,4 +290,46 @@ export const listStoryMemoryCards = async (limit = 20): Promise<StillframeStoryM
     .filter((card): card is StillframeStoryMemoryCard => Boolean(card))
     .sort((left, right) => (left.updatedAt < right.updatedAt ? 1 : -1))
     .slice(0, limit);
+};
+
+export const syncStoryMemoryToFoundryIq = async (
+  options: StoryMemorySyncOptions = {},
+): Promise<StoryMemorySyncResult> => {
+  await ensureDir(STORY_MARKDOWN_DIR);
+  const markdownFiles = (await fs.readdir(STORY_MARKDOWN_DIR))
+    .filter((fileName) => fileName.toLowerCase().endsWith('.md'));
+
+  if (markdownFiles.length === 0) {
+    throw new Error('No stillframe story-memory markdown files found. Save a story first.');
+  }
+
+  const scriptPath = path.join(process.cwd(), 'scripts', 'sync-stillframe-story-memory.ps1');
+  const shell = process.platform === 'win32' ? 'powershell.exe' : 'pwsh';
+  const args = [
+    '-NoProfile',
+    '-ExecutionPolicy',
+    'Bypass',
+    '-File',
+    scriptPath,
+  ];
+
+  if (options.includeStylePack) {
+    args.push('-IncludeStylePack');
+  }
+  if (options.recreateKnowledgeBase) {
+    args.push('-RecreateKnowledgeBase');
+  }
+
+  const { stdout, stderr } = await execFileAsync(shell, args, {
+    cwd: process.cwd(),
+    timeout: 10 * 60 * 1000,
+    maxBuffer: 1024 * 1024 * 5,
+    windowsHide: true,
+  });
+
+  return {
+    markdownCount: markdownFiles.length,
+    stdout: stdout.toString(),
+    stderr: stderr.toString(),
+  };
 };

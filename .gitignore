@@ -13,6 +13,19 @@ build
 dist-ssr
 *.local
 
+# Local secrets and environment overrides
+.env
+.env.local
+
+# Runtime memory, generated sessions, and exported media
+data/stillframe/story-memory-cards/
+data/thumbnail-studio/
+memories/stillframe-stories/
+memories/thumbnail-studio/
+memories/session/
+memories/repo/bundling.md
+memories/repo/library-performance.md
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -38,5 +51,3 @@ audio_titel_liste.md
 obs_ai_visual.py
 obs_babylon_arv.py
 mp4_to_gif_converter.py
-.env.local
-.env
