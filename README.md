@@ -21,14 +21,16 @@ Relevant source material:
 | --- | --- | --- |
 | Creative Apps track fit | Ready | Creator-facing application with AI-assisted ideation, visual generation, and iteration |
 | Working project | Ready | `npm run build` passes |
-| Public source repository | Ready | This repository |
+| Public source repository | Ready | [github.com/audioreworkvisions/arv-hyroglyphs](https://github.com/audioreworkvisions/arv-hyroglyphs) |
 | Project description | Ready | This README |
 | Architecture diagram | Ready | Included below |
 | Microsoft IQ integration | Ready | Foundry IQ grounding, local fallback, story memory, and knowledge sync are integrated and documented |
-| Demo video (5 minutes max) | Pending | Add your final YouTube or Vimeo link before submission |
+| Demo video (5 minutes max) | Ready | [youtu.be/zd8boavsfiw](https://youtu.be/zd8boavsfiw) |
 | Team metadata | Pending if needed | Add team members and Microsoft Learn usernames in the contest submission form if applicable |
 
-Demo video link: Add your final public YouTube or Vimeo URL here before submitting.
+Demo video: [https://youtu.be/zd8boavsfiw](https://youtu.be/zd8boavsfiw)
+
+Public repository: [https://github.com/audioreworkvisions/arv-hyroglyphs](https://github.com/audioreworkvisions/arv-hyroglyphs)
 
 ## What Hyroglyphs Is
 
